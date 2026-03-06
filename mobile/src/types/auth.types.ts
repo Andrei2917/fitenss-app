@@ -23,6 +23,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  profilePictureUrl?: string; // <-- NEW: So the profile picture persists after login
 }
 
 export interface Coach {
@@ -32,6 +33,7 @@ export interface Coach {
   specialty: string;
   bio?: string;
   avatar?: string;
+  profilePictureUrl?: string; // <-- NEW: So the profile picture persists after login
 }
 
 // --- RESPONSES (What the backend sends back to the phone) ---

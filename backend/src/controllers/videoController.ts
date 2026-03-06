@@ -127,7 +127,7 @@ export const getClientVideos = async (req: Request, res: Response): Promise<void
 // Update a video's details
 export const updateVideo = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { videoId } = req.params.userId as any;
+    const videoId = req.params.videoId as string;
     const { title, category } = req.body;
     
     const updatedVideo = await prisma.video.update({
@@ -145,8 +145,7 @@ export const updateVideo = async (req: Request, res: Response): Promise<void> =>
 // Delete a video
 export const deleteVideo = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { videoId } = req.params.videoId as any;
-    
+    const videoId = req.params.videoId as string;    
     await prisma.video.delete({
       where: { id: videoId }
     });

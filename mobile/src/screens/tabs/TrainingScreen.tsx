@@ -17,6 +17,7 @@ import { useStripe } from '@stripe/stripe-react-native';
 import { RootState } from '../../store';
 import { videoApi } from '../../services/api/videoApi';
 import { subscriptionApi } from '../../services/api/subscriptionApi';
+import { config } from '../../constants/config';
 
 // --- Components & Theme ---
 import { Button } from '../../components/common/Button';
@@ -49,7 +50,6 @@ const TrainingScreen = () => {
   const [isSubmittingCode, setIsSubmittingCode] = useState(false);
 
   // --- VIMEO URL CLEANER ---
-  // Keeps your player clean and native-looking based on your Vimeo Pro preset
   const getCleanVideoUrl = (rawUrl: string) => {
     if (!rawUrl) return '';
     let cleanUrl = rawUrl;
@@ -123,7 +123,10 @@ const TrainingScreen = () => {
   const handlePurchase = async () => {
     setIsPurchasing(true);
     try {
+      // 1. Get the payment ticket from backend
       const clientSecret = await videoApi.createPaymentIntent(subId);
+      
+      // 2. Initialize the Stripe Payment Sheet
       const { error: initError } = await initPaymentSheet({
         merchantDisplayName: `${coachName}'s Academy`,
         paymentIntentClientSecret: clientSecret,
@@ -132,13 +135,30 @@ const TrainingScreen = () => {
       
       if (initError) throw new Error(initError.message);
 
+      // 3. Present the Payment Sheet to the user
       const { error: presentError } = await presentPaymentSheet();
       if (presentError) {
         if (presentError.code === 'Canceled') return;
         throw new Error(presentError.message);
       }
       
-      Alert.alert('Payment Successful!', 'Pull down to refresh your active courses!');
+      // 4. NEW: Payment succeeded! Tell the backend to verify & activate the subscription
+      const confirmResponse = await fetch(`${config.API_URL}/payments/confirm-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscriptionId: subId }),
+      });
+      
+      const confirmData = await confirmResponse.json();
+      if (!confirmResponse.ok) {
+        console.warn('Confirm payment warning:', confirmData.error);
+        // Payment went through but confirmation had an issue — still refresh
+      }
+
+      // 5. NEW: Auto-refresh so courses appear immediately!
+      Alert.alert('Payment Successful!', 'Your courses are now unlocked!');
+      await fetchAccess();
+      
     } catch (error: any) {
       Alert.alert('Payment Error', error.message);
     } finally {

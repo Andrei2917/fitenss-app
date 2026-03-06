@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createPaymentIntent, redeemAccessCode } from '../controllers/subscriptionController';
+import { createPaymentIntent, redeemAccessCode, confirmPayment } from '../controllers/subscriptionController';
 
 const router = Router();
 
@@ -8,5 +8,8 @@ router.post('/redeem', redeemAccessCode);
 
 // 2. Mobile app hits this to get the Stripe payment ticket
 router.post('/create-payment-intent', createPaymentIntent);
+
+// 3. Mobile app hits this AFTER payment succeeds to activate the subscription
+router.post('/confirm-payment', confirmPayment);
 
 export default router;

@@ -39,7 +39,7 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
     res.status(201).json({
       message: 'User registered successfully',
       token,
-      user: { id: newUser.id, name: newUser.name, email: newUser.email }
+      user: { id: newUser.id, name: newUser.name, email: newUser.email, profilePictureUrl: newUser.profilePictureUrl }
     });
   } catch (error) {
     console.error(error);
@@ -74,7 +74,7 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
     res.status(200).json({
       message: 'Login successful',
       token,
-      user: { id: user.id, name: user.name, email: user.email }
+      user: { id: user.id, name: user.name, email: user.email, profilePictureUrl: user.profilePictureUrl }
     });
   } catch (error) {
     console.error(error);
@@ -117,7 +117,7 @@ export const registerCoach = async (req: Request, res: Response): Promise<void> 
     res.status(201).json({
       message: 'Coach registered successfully',
       token,
-      coach: { id: newCoach.id, name: newCoach.name, email: newCoach.email, specialty: newCoach.specialty }
+      coach: { id: newCoach.id, name: newCoach.name, email: newCoach.email, specialty: newCoach.specialty, profilePictureUrl: newCoach.profilePictureUrl }
     });
   } catch (error) {
     console.error(error);
@@ -149,7 +149,7 @@ export const loginCoach = async (req: Request, res: Response): Promise<void> => 
     res.status(200).json({
       message: 'Coach login successful',
       token,
-      coach: { id: coach.id, name: coach.name, email: coach.email }
+      coach: { id: coach.id, name: coach.name, email: coach.email, profilePictureUrl: coach.profilePictureUrl }
     });
   } catch (error) {
     console.error(error);
