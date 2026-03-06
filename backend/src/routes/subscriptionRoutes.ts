@@ -1,9 +1,12 @@
 import { Router } from 'express';
-import { createPaymentIntent } from '../controllers/subscriptionController';
+import { createPaymentIntent, redeemAccessCode } from '../controllers/subscriptionController';
 
 const router = Router();
 
-// Mobile app will hit this to get the Stripe payment ticket
+// 1. Mobile app hits this to redeem the Coach's secret code
+router.post('/redeem', redeemAccessCode);
+
+// 2. Mobile app hits this to get the Stripe payment ticket
 router.post('/create-payment-intent', createPaymentIntent);
 
 export default router;

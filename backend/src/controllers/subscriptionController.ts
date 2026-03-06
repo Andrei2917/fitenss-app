@@ -8,6 +8,50 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
 });
 const prisma = new PrismaClient();
 
+export const redeemAccessCode = async (req: Request, res: Response) => {
+  try {
+    const { userId, code } = req.body;
+
+    // 1. Find the code in the database
+    const accessCode = await prisma.accessCode.findUnique({
+      where: { code: code },
+    });
+
+    // 2. Check if it exists and hasn't been used yet
+    if (!accessCode) {
+      return res.status(404).json({ error: 'Invalid access code' });
+    }
+    if (accessCode.usedAt !== null) {
+      return res.status(400).json({ error: 'This code has already been used' });
+    }
+
+    // 3. Mark the code as used and link it to this user
+    await prisma.accessCode.update({
+      where: { id: accessCode.id },
+      data: {
+        usedAt: new Date(),
+        usedBy: userId,
+      },
+    });
+
+    // 4. Create a 'pending' subscription to link the Coach and User!
+    // (This triggers the Paywall screen we built in the mobile app)
+    await prisma.subscription.create({
+      data: {
+        status: 'pending', 
+        userId: userId,
+        coachId: accessCode.coachId,
+        endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 10)), // Arbitrary future date for lifetime access
+      },
+    });
+
+    res.status(200).json({ success: true, message: 'Coach linked successfully!' });
+  } catch (error) {
+    console.error('Redeem Code Error:', error);
+    res.status(500).json({ error: 'Failed to redeem code' });
+  }
+};
+
 export const createPaymentIntent = async (req: Request, res: Response): Promise<void> => {
   try {
     const { subscriptionId } = req.body;
@@ -53,3 +97,4 @@ export const createPaymentIntent = async (req: Request, res: Response): Promise<
     res.status(500).json({ error: 'Failed to initialize payment.' });
   }
 };
+

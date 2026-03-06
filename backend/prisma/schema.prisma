@@ -19,6 +19,7 @@ model User {
   password         String
   name             String
   createdAt        DateTime       @default(now())
+  profilePictureUrl String?
   
   // --- STRIPE UPDATE ---
   stripeCustomerId String?        @unique // Saves their credit card profile!
@@ -41,6 +42,7 @@ model Coach {
   password          String
   specialty         String
   bio               String?
+  profilePictureUrl String?  
 
   // --- STRIPE UPDATE ---
   subscriptionPrice Float            @default(19.99) // Allows coaches to set their own price!
