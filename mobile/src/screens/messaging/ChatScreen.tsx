@@ -17,7 +17,6 @@ const ChatScreen = ({ route }: any) => {
   const { coachId, coachName, userId: routeUserId } = route.params;
   const authState = useSelector((state: RootState) => state.auth as any);
   const isCoach = authState.role === 'coach';
-  const myId = isCoach ? authState.coach?.id : authState.user?.id;
   const userId = routeUserId || authState.user?.id;
   const senderType = isCoach ? 'coach' : 'user';
 
@@ -30,9 +29,7 @@ const ChatScreen = ({ route }: any) => {
 
   useEffect(() => {
     loadMessages();
-    // Mark messages as read
     messageApi.markAsRead(userId, coachId, senderType);
-    // Poll for new messages every 3 seconds
     pollInterval.current = setInterval(loadMessages, 3000);
     return () => clearInterval(pollInterval.current);
   }, []);
