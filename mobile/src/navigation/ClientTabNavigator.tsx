@@ -1,11 +1,28 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons'; // <-- NEW: Import the premium icons!
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 
 import { ForumStackNavigator } from './ForumStackNavigator';
-import TrainingScreen from '../screens/tabs/TrainingScreen'; // <-- Fixed path!
+import TrainingScreen from '../screens/tabs/TrainingScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
+import CompleteProfileScreen from '../screens/profile/CompleteProfileScreen';
 import { colors } from '../constants/colors';
+
+// Wrap ProfileScreen in its own stack so it can navigate to CompleteProfile
+const ProfileStack = createNativeStackNavigator();
+const ProfileStackNavigator = () => (
+  <ProfileStack.Navigator
+    screenOptions={{
+      headerStyle: { backgroundColor: colors.primary },
+      headerTintColor: colors.white,
+      headerTitleStyle: { fontWeight: 'bold' },
+    }}
+  >
+    <ProfileStack.Screen name="ProfileMain" component={ProfileScreen} options={{ title: 'Settings' }} />
+    <ProfileStack.Screen name="CompleteProfile" component={CompleteProfileScreen} options={{ title: 'Complete Profile' }} />
+  </ProfileStack.Navigator>
+);
 
 const Tab = createBottomTabNavigator();
 
@@ -17,26 +34,21 @@ const ClientTabNavigator = () => {
         tabBarInactiveTintColor: colors.textLight,
         headerShown: false,
         
-        // --- NEW: Dynamic Icon Injection ---
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap = 'help-circle'; // Fallback icon
+          let iconName: keyof typeof Ionicons.glyphMap = 'help-circle';
 
-          if (route.name === 'CommunityTab') {
-            // Chat bubbles for the forum
-            iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+          if (route.name === 'HomeTab') {
+            // Home icon instead of chat bubbles
+            iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'TrainingTab') {
-            // A play button for the video courses
             iconName = focused ? 'play-circle' : 'play-circle-outline';
           } else if (route.name === 'ProfileTab') {
-            // A human silhouette for the profile/settings
-            iconName = focused ? 'person' : 'person-outline';
+            iconName = focused ? 'settings' : 'settings-outline';
           }
 
-          // Returns the perfectly sized and colored icon
           return <Ionicons name={iconName} size={size + 2} color={color} />;
         },
         
-        // Polish the tab bar spacing so it doesn't look cramped
         tabBarStyle: {
           paddingBottom: 5,
           paddingTop: 5,
@@ -45,9 +57,9 @@ const ClientTabNavigator = () => {
       })}
     >
       <Tab.Screen 
-        name="CommunityTab" 
+        name="HomeTab" 
         component={ForumStackNavigator} 
-        options={{ title: 'Community' }} 
+        options={{ title: 'Home' }}  // <-- RENAMED from 'Community'
       />
       <Tab.Screen 
         name="TrainingTab" 
@@ -56,11 +68,11 @@ const ClientTabNavigator = () => {
       />
       <Tab.Screen 
         name="ProfileTab" 
-        component={ProfileScreen} 
-        options={{ title: 'Profile' }} 
+        component={ProfileStackNavigator} 
+        options={{ title: 'Settings' }}  // <-- RENAMED from 'Profile'
       />
     </Tab.Navigator>
   );
 };
 
-export default ClientTabNavigator; // <-- Ensures RootNavigator can read it!
+export default ClientTabNavigator;

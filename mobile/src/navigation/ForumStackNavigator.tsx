@@ -3,12 +3,20 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import ForumListScreen from '../screens/forum/forumListScreen';
 import PostDetailScreen from '../screens/forum/postDetailScreen';
 import FindCoachScreen from '../screens/tabs/ExploreCoachesScreen';
+import CoachProfileScreen from '../screens/profile/CoachProfileScreen';
 import { colors } from '../constants/colors';
 
 export type ForumStackParamList = {
   ForumList: undefined;
   PostDetail: { postId: string; title: string };
-  FindCoach: undefined; // <-- ADD THIS
+  FindCoach: undefined;
+  CoachProfile: {
+    coachId: string;
+    coachName: string;
+    specialty: string;
+    bio?: string;
+    profilePictureUrl?: string;
+  };
 };
 
 const Stack = createNativeStackNavigator<ForumStackParamList>();
@@ -25,18 +33,22 @@ export const ForumStackNavigator = () => {
       <Stack.Screen 
         name="ForumList" 
         component={ForumListScreen} 
-        options={{ title: 'Community' }} 
+        options={{ title: 'Home' }}  // <-- RENAMED from 'Community'
       />
       <Stack.Screen 
         name="PostDetail" 
         component={PostDetailScreen} 
         options={({ route }) => ({ title: route.params.title })} 
       />
-      {/* ADD THIS SCREEN TO THE STACK */}
       <Stack.Screen 
         name="FindCoach" 
         component={FindCoachScreen} 
         options={{ title: 'Find a Coach' }} 
+      />
+      <Stack.Screen 
+        name="CoachProfile" 
+        component={CoachProfileScreen} 
+        options={({ route }) => ({ title: route.params.coachName })} 
       />
     </Stack.Navigator>
   );

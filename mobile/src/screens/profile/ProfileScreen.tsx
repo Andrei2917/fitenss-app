@@ -1,23 +1,21 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, ActivityIndicator } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import * as ImagePicker from 'expo-image-picker'; // <-- NEW: Expo Image Picker
+import * as ImagePicker from 'expo-image-picker';
 import { RootState } from '../../store';
 import { logout } from '../../store/slices/authSlice';
-import { profileApi } from '../../services/api/authApi'; // <-- NEW: The API we built in Step 2
+import { profileApi } from '../../services/api/authApi';
 import { colors } from '../../constants/colors';
 import { theme } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons'; 
 
-const ProfileScreen = () => {
+const ProfileScreen = ({ navigation }: any) => {
   const dispatch = useDispatch();
   
-  // Grab user or coach data
   const authState = useSelector((state: RootState) => state.auth as any);
   const user = authState.user || authState.coach;
   const role = authState.role || (authState.coach ? 'coach' : 'client');
 
-  // --- NEW: Upload State ---
   const [isUploading, setIsUploading] = useState(false);
 
   const handleLogout = () => {
@@ -31,28 +29,20 @@ const ProfileScreen = () => {
     Alert.alert('Coming Soon', `The ${feature} feature is currently under development!`);
   };
 
-  // --- NEW: Image Picker & Upload Logic ---
   const handlePickImage = async () => {
-    // 1. Ask for permission and open the gallery
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      aspect: [1, 1], // Forces a perfect square!
-      quality: 0.7,   // Compresses slightly for faster uploads
+      aspect: [1, 1],
+      quality: 0.7,
     });
 
-    // 2. If they didn't cancel, upload it!
     if (!result.canceled) {
       setIsUploading(true);
       try {
         const imageUri = result.assets[0].uri;
-        
-        // Call the backend API
         const newUrl = await profileApi.uploadAvatar(user.id, role, imageUri);
-        
-        // Step 4 Preview: We will dispatch this to Redux shortly!
         dispatch({ type: 'auth/updateProfilePicture', payload: newUrl }); 
-        
         Alert.alert('Success', 'Profile picture updated successfully!');
       } catch (error: any) {
         Alert.alert('Upload Failed', error.message || 'Something went wrong.');
@@ -62,7 +52,6 @@ const ProfileScreen = () => {
     }
   };
 
-  // Reusable Settings Row
   const SettingsRow = ({ icon, title, onPress, color = colors.text }: any) => (
     <TouchableOpacity style={styles.settingsRow} onPress={onPress}>
       <View style={styles.settingsRowLeft}>
@@ -78,8 +67,6 @@ const ProfileScreen = () => {
       
       {/* 1. HEADER PROFILE SECTION */}
       <View style={styles.headerCard}>
-        
-        {/* --- NEW: Clickable Avatar UI --- */}
         <TouchableOpacity onPress={handlePickImage} disabled={isUploading}>
           <View style={styles.avatarContainer}>
             {user?.profilePictureUrl ? (
@@ -89,8 +76,6 @@ const ProfileScreen = () => {
                 <Text style={styles.avatarText}>{user?.name?.charAt(0)?.toUpperCase() || '?'}</Text>
               </View>
             )}
-            
-            {/* Show a spinner while uploading, otherwise show the camera icon */}
             {isUploading ? (
               <View style={styles.uploadingOverlay}>
                 <ActivityIndicator color={colors.white} size="small" />
@@ -109,6 +94,29 @@ const ProfileScreen = () => {
           <Text style={styles.badgeText}>{role.toUpperCase()}</Text>
         </View>
       </View>
+
+      {/* ============================================ */}
+      {/* NEW: COMPLETE YOUR PROFILE (only for clients) */}
+      {/* ============================================ */}
+      {role === 'client' && (
+        <TouchableOpacity
+          style={styles.completeProfileCard}
+          onPress={() => navigation.navigate('CompleteProfile')}
+        >
+          <View style={styles.completeProfileLeft}>
+            <View style={styles.miniDial}>
+              <Ionicons name="person-add-outline" size={24} color={colors.primary} />
+            </View>
+            <View>
+              <Text style={styles.completeProfileTitle}>Complete Your Profile</Text>
+              <Text style={styles.completeProfileSubtitle}>
+                Set your goals, body metrics & preferences
+              </Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={22} color={colors.textLight} />
+        </TouchableOpacity>
+      )}
 
       {/* 2. ACCOUNT SETTINGS */}
       <View style={styles.section}>
@@ -157,36 +165,53 @@ const ProfileScreen = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  
-  // Header Styles
   headerCard: { backgroundColor: colors.white, padding: 30, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#eee', marginBottom: 20 },
-  
-  // --- NEW: Avatar Styles ---
   avatarContainer: { position: 'relative', marginBottom: 15 },
   avatarPlaceholder: { width: 90, height: 90, borderRadius: 45, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
   avatarImage: { width: 90, height: 90, borderRadius: 45 },
   avatarText: { color: colors.white, fontSize: 36, fontWeight: 'bold' },
   cameraBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: colors.primary, width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: colors.white },
   uploadingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 45, justifyContent: 'center', alignItems: 'center' },
-
   name: { fontSize: 24, fontWeight: 'bold', color: colors.text, marginBottom: 5 },
   email: { fontSize: 16, color: colors.textLight, marginBottom: 15 },
   badge: { backgroundColor: '#f0f0f0', paddingHorizontal: 15, paddingVertical: 6, borderRadius: 20 },
   badgeText: { fontSize: 12, fontWeight: 'bold', color: colors.textLight, letterSpacing: 1 },
 
-  // Section Styles
+  // Complete Profile Card
+  completeProfileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.accentIce,
+    marginHorizontal: 20,
+    marginBottom: 25,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+  },
+  completeProfileLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  miniDial: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  completeProfileTitle: { fontSize: 15, fontWeight: 'bold', color: colors.primary },
+  completeProfileSubtitle: { fontSize: 12, color: colors.textLight, marginTop: 2 },
+
   section: { paddingHorizontal: 20, marginBottom: 25 },
   sectionTitle: { fontSize: 14, fontWeight: 'bold', color: colors.textLight, textTransform: 'uppercase', marginBottom: 10, letterSpacing: 0.5, marginLeft: 5 },
   sectionCard: { backgroundColor: colors.white, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#eee' },
-  
-  // Row Styles
   settingsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, paddingHorizontal: 20 },
   settingsRowLeft: { flexDirection: 'row', alignItems: 'center' },
   settingsIcon: { marginRight: 15 },
   settingsTitle: { fontSize: 16, fontWeight: '500' },
   divider: { height: 1, backgroundColor: '#eee', marginLeft: 55 },
-
-  // Logout & Footer
   logoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white, marginHorizontal: 20, paddingVertical: 16, borderRadius: 16, borderWidth: 1, borderColor: '#ffebee', marginTop: 10, marginBottom: 20 },
   logoutText: { fontSize: 16, fontWeight: 'bold', color: colors.error || '#e74c3c' },
   versionText: { textAlign: 'center', color: colors.textLight, fontSize: 12 },

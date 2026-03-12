@@ -27,12 +27,13 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-  [
-    "@stripe/stripe-react-native",
-    {
-      "merchantIdentifier": "merchant.com.yourfitnessapp"
-    }
-  ]
-]
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.yourfitnessapp"
+        }
+      ],
+      "expo-secure-store"
+    ]
   }
 }

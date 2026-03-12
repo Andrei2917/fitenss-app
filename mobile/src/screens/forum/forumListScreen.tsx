@@ -1,42 +1,55 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Modal, TextInput, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Modal, TextInput, RefreshControl, Image, Dimensions } from 'react-native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { forumApi } from '../../services/api/forumApi';
+import { coachApi } from '../../services/api/coachApi';
 import { colors } from '../../constants/colors';
 import { theme } from '../../constants/theme';
 
+const { width } = Dimensions.get('window');
+const CARD_WIDTH = width * 0.42;
+
+interface Coach {
+  id: string;
+  name: string;
+  specialty: string;
+  bio?: string;
+  profilePictureUrl?: string;
+}
+
 const ForumListScreen = ({ navigation }: any) => {
-  // Grab the whole auth state
   const authState = useSelector((state: RootState) => state.auth as any);
   const myId = authState?.user?.id || authState?.coach?.id;
-  
-  // --- THE FIX: Check if the logged-in person is a Coach! ---
   const isCurrentUserCoach = !!authState?.coach || authState?.role === 'coach';
   
   const [posts, setPosts] = useState<any[]>([]);
+  const [coaches, setCoaches] = useState<Coach[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   
-  // Modal State for creating a new post
   const [isModalVisible, setModalVisible] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
 
-  const fetchPosts = async () => {
+  const fetchData = async () => {
     try {
-      const data = await forumApi.getPosts();
-      setPosts(data);
+      const [postsData, coachesData] = await Promise.all([
+        forumApi.getPosts(),
+        !isCurrentUserCoach ? coachApi.getAllCoaches() : Promise.resolve([]),
+      ]);
+      setPosts(postsData);
+      if (!isCurrentUserCoach) setCoaches(coachesData);
     } catch (error: any) {
-      Alert.alert('Error', 'Could not load forum posts.');
+      Alert.alert('Error', 'Could not load data.');
     } finally {
       setIsLoading(false);
       setRefreshing(false);
     }
   };
 
-  useEffect(() => { fetchPosts(); }, []);
-  const onRefresh = () => { setRefreshing(true); fetchPosts(); };
+  useEffect(() => { fetchData(); }, []);
+  const onRefresh = () => { setRefreshing(true); fetchData(); };
 
   const handleCreatePost = async () => {
     if (!newTitle.trim() || !newContent.trim()) return Alert.alert('Error', 'Title and content are required.');
@@ -53,6 +66,36 @@ const ForumListScreen = ({ navigation }: any) => {
       Alert.alert('Error', 'Failed to post.');
     }
   };
+
+  // ========================================
+  // COACH CARD (YouTube Music "Albums for you" style)
+  // ========================================
+  const renderCoachCard = ({ item }: { item: Coach }) => (
+    <TouchableOpacity
+      style={styles.coachCard}
+      onPress={() =>
+        navigation.navigate('CoachProfile', {
+          coachId: item.id,
+          coachName: item.name,
+          specialty: item.specialty,
+          bio: item.bio,
+          profilePictureUrl: item.profilePictureUrl,
+        })
+      }
+    >
+      <View style={styles.coachImageContainer}>
+        {item.profilePictureUrl ? (
+          <Image source={{ uri: item.profilePictureUrl }} style={styles.coachImage} />
+        ) : (
+          <View style={styles.coachImagePlaceholder}>
+            <Text style={styles.coachInitial}>{item.name.charAt(0).toUpperCase()}</Text>
+          </View>
+        )}
+      </View>
+      <Text style={styles.coachCardName} numberOfLines={1}>{item.name}</Text>
+      <Text style={styles.coachCardSpecialty} numberOfLines={1}>{item.specialty || 'Fitness Coach'}</Text>
+    </TouchableOpacity>
+  );
 
   const renderPost = ({ item }: { item: any }) => {
     const isCoachPost = !!item.coach;
@@ -84,17 +127,6 @@ const ForumListScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      
-      {/* --- CONDITIONAL RENDER: Only show this to Clients! --- */}
-      {!isCurrentUserCoach && (
-        <TouchableOpacity 
-          style={styles.searchBar} 
-          onPress={() => navigation.navigate('FindCoach')}
-        >
-          <Text style={styles.searchText}>🔍 Find a Coach / View Connections</Text>
-        </TouchableOpacity>
-      )}
-
       {isLoading ? (
         <ActivityIndicator size="large" color={colors.primary} style={styles.centered} />
       ) : (
@@ -104,6 +136,27 @@ const ForumListScreen = ({ navigation }: any) => {
           renderItem={renderPost}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           contentContainerStyle={{ paddingBottom: 100 }}
+          ListHeaderComponent={
+            // =============================================
+            // HORIZONTAL COACH CAROUSEL (YouTube Music style)
+            // Only visible to Clients
+            // =============================================
+            !isCurrentUserCoach && coaches.length > 0 ? (
+              <View style={styles.carouselSection}>
+                <Text style={styles.carouselTitle}>Explore Coaches</Text>
+                <FlatList
+                  data={coaches}
+                  keyExtractor={(item) => item.id}
+                  renderItem={renderCoachCard}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingRight: 16 }}
+                  snapToInterval={CARD_WIDTH + 12}
+                  decelerationRate="fast"
+                />
+              </View>
+            ) : null
+          }
           ListEmptyComponent={<Text style={styles.emptyText}>No discussions yet. Be the first to ask a question!</Text>}
         />
       )}
@@ -149,10 +202,60 @@ const ForumListScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: theme.spacing.md },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
+  // ============= COACH CAROUSEL STYLES =============
+  carouselSection: { marginBottom: 20 },
+  carouselTitle: { fontSize: 22, fontWeight: 'bold', color: colors.text, marginBottom: 14 },
   
-  // Search Bar Styles
-  searchBar: { backgroundColor: colors.white, padding: 15, borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: '#eee', alignItems: 'center' },
-  searchText: { fontSize: 16, fontWeight: 'bold', color: colors.primary },
+  coachCard: {
+    width: CARD_WIDTH,
+    marginRight: 12,
+    borderRadius: 14,
+    backgroundColor: colors.white,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+  },
+  coachImageContainer: {
+    width: CARD_WIDTH,
+    height: CARD_WIDTH,
+    backgroundColor: colors.accentIce,
+  },
+  coachImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  coachImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  coachInitial: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: colors.white,
+  },
+  coachCardName: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: colors.text,
+    paddingHorizontal: 10,
+    paddingTop: 10,
+  },
+  coachCardSpecialty: {
+    fontSize: 12,
+    color: colors.textLight,
+    paddingHorizontal: 10,
+    paddingBottom: 12,
+    marginTop: 2,
+  },
+  // ==================================================
 
   card: { backgroundColor: colors.white, padding: 18, borderRadius: 12, marginBottom: 15, elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
   postTitle: { fontSize: 18, fontWeight: 'bold', color: colors.text, marginBottom: 10 },
