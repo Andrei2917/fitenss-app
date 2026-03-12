@@ -23,8 +23,8 @@ export const getAllPosts = async (req: Request, res: Response): Promise<void> =>
 // 2. GET A SINGLE POST WITH COMMENTS
 export const getPostById = async (req: Request, res: Response): Promise<void> => {
   try {
-    const id = req.params.id as string;
-
+    const id = req.params.id as string; 
+    
     const post = await prisma.post.findUnique({
       where: { id },
       include: {
@@ -88,7 +88,7 @@ export const createComment = async (req: Request, res: Response): Promise<void> 
     const authorId = userId || coachId;
 
     if (!content || !authorId) {
-      res.status(400).json({ error: 'Comment content and author ID are required' });
+      res.status(400).json({ error: 'Content and author ID are required' });
       return;
     }
 

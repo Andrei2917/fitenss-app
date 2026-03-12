@@ -100,6 +100,7 @@ const ForumListScreen = ({ navigation }: any) => {
   const renderPost = ({ item }: { item: any }) => {
     const isCoachPost = !!item.coach;
     const authorName = isCoachPost ? item.coach.name : (item.user?.name || 'Anonymous');
+    const authorPhoto = isCoachPost ? item.coach?.profilePictureUrl : item.user?.profilePictureUrl;
 
     return (
       <TouchableOpacity 
@@ -109,16 +110,31 @@ const ForumListScreen = ({ navigation }: any) => {
         <Text style={styles.postTitle} numberOfLines={2}>{item.title}</Text>
         
         <View style={styles.authorRow}>
-          <View style={styles.authorNameContainer}>
-            <Text style={[styles.authorName, isCoachPost && styles.coachName]}>
-              {authorName}
-            </Text>
-            {isCoachPost && (
-              <View style={styles.verifiedBadgeSmall}>
-                <Text style={styles.verifiedTextSmall}>✓</Text>
+          <View style={styles.authorInfoRow}>
+            {/* AUTHOR AVATAR */}
+            {authorPhoto ? (
+              <Image source={{ uri: authorPhoto }} style={styles.authorAvatar} />
+            ) : (
+              <View style={[styles.authorAvatar, styles.authorAvatarPlaceholder]}>
+                <Text style={styles.authorAvatarText}>
+                  {authorName.charAt(0).toUpperCase()}
+                </Text>
               </View>
             )}
+
+            {/* AUTHOR NAME + BADGE */}
+            <View style={styles.authorNameContainer}>
+              <Text style={[styles.authorName, isCoachPost && styles.coachName]}>
+                {authorName}
+              </Text>
+              {isCoachPost && (
+                <View style={styles.verifiedBadgeSmall}>
+                  <Text style={styles.verifiedTextSmall}>✓</Text>
+                </View>
+              )}
+            </View>
           </View>
+
           <Text style={styles.commentCount}>💬 {item._count?.comments || 0} Comments</Text>
         </View>
       </TouchableOpacity>
@@ -137,10 +153,6 @@ const ForumListScreen = ({ navigation }: any) => {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           contentContainerStyle={{ paddingBottom: 100 }}
           ListHeaderComponent={
-            // =============================================
-            // HORIZONTAL COACH CAROUSEL (YouTube Music style)
-            // Only visible to Clients
-            // =============================================
             !isCurrentUserCoach && coaches.length > 0 ? (
               <View style={styles.carouselSection}>
                 <Text style={styles.carouselTitle}>Explore Coaches</Text>
@@ -258,9 +270,17 @@ const styles = StyleSheet.create({
   // ==================================================
 
   card: { backgroundColor: colors.white, padding: 18, borderRadius: 12, marginBottom: 15, elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
-  postTitle: { fontSize: 18, fontWeight: 'bold', color: colors.text, marginBottom: 10 },
+  postTitle: { fontSize: 18, fontWeight: 'bold', color: colors.text, marginBottom: 12 },
   
+  // Author row — now includes avatar
   authorRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  authorInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  
+  // Author avatar (small circle on post cards)
+  authorAvatar: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: '#eee' },
+  authorAvatarPlaceholder: { backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
+  authorAvatarText: { color: colors.white, fontSize: 14, fontWeight: 'bold' },
+
   authorNameContainer: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   authorName: { fontSize: 14, color: colors.textLight, fontWeight: '500' },
   coachName: { color: colors.primary, fontWeight: 'bold' },
