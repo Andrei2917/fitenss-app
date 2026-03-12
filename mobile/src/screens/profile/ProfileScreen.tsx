@@ -52,29 +52,6 @@ const ProfileScreen = ({ navigation }: any) => {
     }
   };
 
-        {/* ============================================ */}
-      {/* NEW: EDIT PUBLIC PROFILE (only for coaches)  */}
-      {/* ============================================ */}
-      {role === 'coach' && (
-        <TouchableOpacity
-          style={styles.completeProfileCard}
-          onPress={() => navigation.navigate('EditCoachProfile')}
-        >
-          <View style={styles.completeProfileLeft}>
-            <View style={styles.miniDial}>
-              <Ionicons name="create-outline" size={24} color={colors.primary} />
-            </View>
-            <View>
-              <Text style={styles.completeProfileTitle}>Edit Public Profile</Text>
-              <Text style={styles.completeProfileSubtitle}>
-                Bio, tagline, offerings & pricing
-              </Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={22} color={colors.textLight} />
-        </TouchableOpacity>
-      )}
-      
   const SettingsRow = ({ icon, title, onPress, color = colors.text }: any) => (
     <TouchableOpacity style={styles.settingsRow} onPress={onPress}>
       <View style={styles.settingsRowLeft}>
@@ -118,9 +95,7 @@ const ProfileScreen = ({ navigation }: any) => {
         </View>
       </View>
 
-      {/* ============================================ */}
-      {/* NEW: COMPLETE YOUR PROFILE (only for clients) */}
-      {/* ============================================ */}
+      {/* COMPLETE YOUR PROFILE (only for clients) */}
       {role === 'client' && (
         <TouchableOpacity
           style={styles.completeProfileCard}
@@ -134,6 +109,27 @@ const ProfileScreen = ({ navigation }: any) => {
               <Text style={styles.completeProfileTitle}>Complete Your Profile</Text>
               <Text style={styles.completeProfileSubtitle}>
                 Set your goals, body metrics & preferences
+              </Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={22} color={colors.textLight} />
+        </TouchableOpacity>
+      )}
+
+      {/* EDIT PUBLIC PROFILE (only for coaches) */}
+      {role === 'coach' && (
+        <TouchableOpacity
+          style={styles.completeProfileCard}
+          onPress={() => navigation.navigate('EditCoachProfile')}
+        >
+          <View style={styles.completeProfileLeft}>
+            <View style={styles.miniDial}>
+              <Ionicons name="create-outline" size={24} color={colors.primary} />
+            </View>
+            <View>
+              <Text style={styles.completeProfileTitle}>Edit Public Profile</Text>
+              <Text style={styles.completeProfileSubtitle}>
+                Bio, tagline, offerings & pricing
               </Text>
             </View>
           </View>
@@ -205,7 +201,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.accentIce,
+    backgroundColor: '#e8f0fe',
     marginHorizontal: 20,
     marginBottom: 25,
     padding: 16,

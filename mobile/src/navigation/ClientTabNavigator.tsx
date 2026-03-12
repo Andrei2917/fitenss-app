@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import * as SecureStore from 'expo-secure-store';
 
 import { ForumStackNavigator } from './ForumStackNavigator';
 import TrainingScreen from '../screens/tabs/TrainingScreen';
@@ -41,7 +44,7 @@ const MessagesStackNavigator = () => (
   </MessagesStack.Navigator>
 );
 
-// Training Stack (to accept route params from CoachProfile)
+// Training Stack
 const TrainingStack = createNativeStackNavigator();
 const TrainingStackNavigator = () => (
   <TrainingStack.Navigator
@@ -57,43 +60,99 @@ const TrainingStackNavigator = () => (
 
 const Tab = createBottomTabNavigator();
 
-const ClientTabNavigator = () => {
+// =============================================
+// Persistent "Complete Profile" floating banner
+// =============================================
+const CompleteProfileBanner = () => {
+  const [isProfileComplete, setIsProfileComplete] = useState(true); // assume complete by default
+  const navigation = useNavigation<any>();
+
+  useEffect(() => {
+    checkProfileCompletion();
+  }, []);
+
+  const checkProfileCompletion = async () => {
+    const completed = await SecureStore.getItemAsync('profile_completed');
+    setIsProfileComplete(completed === 'true');
+  };
+
+  const handleDismiss = async () => {
+    // Dismiss until next app open
+    setIsProfileComplete(true);
+  };
+
+  if (isProfileComplete) return null;
+
   return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textLight,
-        headerShown: false,
-        
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap = 'help-circle';
-
-          if (route.name === 'HomeTab') {
-            iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'TrainingTab') {
-            iconName = focused ? 'play-circle' : 'play-circle-outline';
-          } else if (route.name === 'MessagesTab') {
-            iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
-          } else if (route.name === 'ProfileTab') {
-            iconName = focused ? 'settings' : 'settings-outline';
-          }
-
-          return <Ionicons name={iconName} size={size + 2} color={color} />;
-        },
-        
-        tabBarStyle: {
-          paddingBottom: 5,
-          paddingTop: 5,
-          height: 60,
-        },
-      })}
+    <TouchableOpacity
+      style={bannerStyles.banner}
+      onPress={() => navigation.navigate('ProfileTab', { screen: 'CompleteProfile' })}
     >
-      <Tab.Screen name="HomeTab" component={ForumStackNavigator} options={{ title: 'Home' }} />
-      <Tab.Screen name="TrainingTab" component={TrainingStackNavigator} options={{ title: 'Courses' }} />
-      <Tab.Screen name="MessagesTab" component={MessagesStackNavigator} options={{ title: 'Messages' }} />
-      <Tab.Screen name="ProfileTab" component={ProfileStackNavigator} options={{ title: 'Settings' }} />
-    </Tab.Navigator>
+      <View style={bannerStyles.bannerLeft}>
+        <Ionicons name="alert-circle" size={20} color={colors.white} />
+        <Text style={bannerStyles.bannerText}>Complete setting up your informations</Text>
+      </View>
+      <TouchableOpacity onPress={handleDismiss}>
+        <Ionicons name="close" size={20} color="rgba(255,255,255,0.7)" />
+      </TouchableOpacity>
+    </TouchableOpacity>
   );
 };
+
+const ClientTabNavigator = () => {
+  return (
+    <View style={{ flex: 1 }}>
+      <CompleteProfileBanner />
+      <Tab.Navigator
+        screenOptions={({ route }) => ({
+          tabBarActiveTintColor: colors.primary,
+          tabBarInactiveTintColor: colors.textLight,
+          headerShown: false,
+          
+          tabBarIcon: ({ focused, color, size }) => {
+            let iconName: keyof typeof Ionicons.glyphMap = 'help-circle';
+
+            if (route.name === 'HomeTab') {
+              iconName = focused ? 'home' : 'home-outline';
+            } else if (route.name === 'TrainingTab') {
+              iconName = focused ? 'play-circle' : 'play-circle-outline';
+            } else if (route.name === 'MessagesTab') {
+              iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+            } else if (route.name === 'ProfileTab') {
+              iconName = focused ? 'settings' : 'settings-outline';
+            }
+
+            return <Ionicons name={iconName} size={size + 2} color={color} />;
+          },
+          
+          tabBarStyle: {
+            paddingBottom: 5,
+            paddingTop: 5,
+            height: 60,
+          },
+        })}
+      >
+        <Tab.Screen name="HomeTab" component={ForumStackNavigator} options={{ title: 'Home' }} />
+        <Tab.Screen name="TrainingTab" component={TrainingStackNavigator} options={{ title: 'Courses' }} />
+        <Tab.Screen name="MessagesTab" component={MessagesStackNavigator} options={{ title: 'Messages' }} />
+        <Tab.Screen name="ProfileTab" component={ProfileStackNavigator} options={{ title: 'Settings' }} />
+      </Tab.Navigator>
+    </View>
+  );
+};
+
+const bannerStyles = StyleSheet.create({
+  banner: {
+    backgroundColor: '#e67e22',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    zIndex: 100,
+  },
+  bannerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  bannerText: { color: colors.white, fontSize: 13, fontWeight: '600', flex: 1 },
+});
 
 export default ClientTabNavigator;

@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Animated } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthNavigator } from './AuthNavigator';
 import ClientTabNavigator from './ClientTabNavigator';
 import CoachTabNavigator from './CoachTabNavigator';
@@ -11,16 +12,15 @@ import { colors } from '../constants/colors';
 const WelcomeBanner = ({ name }: { name: string }) => {
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const dispatch = useDispatch<AppDispatch>();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    // Fade in
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 500,
       useNativeDriver: true,
     }).start();
 
-    // After 3 seconds, fade out then dismiss
     const timer = setTimeout(() => {
       Animated.timing(fadeAnim, {
         toValue: 0,
@@ -35,7 +35,15 @@ const WelcomeBanner = ({ name }: { name: string }) => {
   }, []);
 
   return (
-    <Animated.View style={[styles.welcomeBanner, { opacity: fadeAnim }]}>
+    <Animated.View
+      style={[
+        styles.welcomeBanner,
+        {
+          opacity: fadeAnim,
+          top: insets.top + 10,
+        },
+      ]}
+    >
       <Text style={styles.welcomeText}>👋 Welcome back, {name}!</Text>
     </Animated.View>
   );
@@ -51,7 +59,6 @@ export const RootNavigator = () => {
     dispatch(restoreSession());
   }, [dispatch]);
 
-  // Show a loading spinner while checking SecureStore
   if (isRestoringSession) {
     return (
       <View style={styles.loadingContainer}>
@@ -60,14 +67,12 @@ export const RootNavigator = () => {
     );
   }
 
-  // Not logged in
   if (!token) {
     return <AuthNavigator />;
   }
 
   const userName = user?.name || coach?.name || 'User';
 
-  // Logged in
   return (
     <View style={{ flex: 1 }}>
       {showWelcomeBack && <WelcomeBanner name={userName} />}
@@ -85,15 +90,15 @@ const styles = StyleSheet.create({
   },
   welcomeBanner: {
     position: 'absolute',
-    top: 50,
-    left: 20,
-    right: 20,
+    left: 24,
+    right: 24,
     zIndex: 999,
     backgroundColor: colors.primary,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 14,
     alignItems: 'center',
+    justifyContent: 'center',
     elevation: 10,
     shadowColor: '#000',
     shadowOpacity: 0.25,
@@ -104,5 +109,6 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 16,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
 });

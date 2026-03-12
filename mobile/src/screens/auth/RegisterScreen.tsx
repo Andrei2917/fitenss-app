@@ -12,7 +12,7 @@ import { Button } from '../../components/common/Button';
 import { colors } from '../../constants/colors';
 import { theme } from '../../constants/theme';
 import { AuthRoutes, RootStackParamList } from '../../navigation/routes';
-import { registerUser, registerCoach } from '../../store/slices/authSlice'; // <-- Imported both!
+import { registerUser, registerCoach } from '../../store/slices/authSlice';
 import { AppDispatch } from '../../store';
 
 type RegisterScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, AuthRoutes.REGISTER>;
@@ -25,11 +25,10 @@ const RegisterScreen = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [specialty, setSpecialty] = useState(''); // <-- Specific to Coaches!
+  const [specialty, setSpecialty] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleRegister = async () => {
-    // Validation
     if (!name || !email || !password) {
       Alert.alert('Error', 'Please fill in all basic fields.');
       return;
@@ -43,11 +42,22 @@ const RegisterScreen = () => {
     try {
       if (isCoach) {
         await dispatch(registerCoach({ name, email, password, specialty })).unwrap();
+        Alert.alert('Welcome!', 'Your Coach account has been created.');
       } else {
         await dispatch(registerUser({ name, email, password })).unwrap();
+        // After client registration, show the Complete Profile popup
+        Alert.alert(
+          '🎉 Welcome!',
+          'Your account has been created! Would you like to complete your profile now?',
+          [
+            { text: 'Skip for now', style: 'cancel' },
+            { text: 'Complete Profile', onPress: () => {
+              // This will be handled once they're logged in — the navigation 
+              // will auto-switch to ClientTabNavigator, which has CompleteProfile in its stack
+            }},
+          ]
+        );
       }
-      
-      Alert.alert('Welcome!', `Your ${isCoach ? 'Coach' : 'Client'} account has been created.`);
     } catch (error) {
       Alert.alert('Registration Failed', error as string);
     } finally {
@@ -66,7 +76,6 @@ const RegisterScreen = () => {
               <Text style={styles.subtitle}>Join us and get closer to your goals.</Text>
             </View>
 
-            {/* --- THE ROLE TOGGLE --- */}
             <View style={styles.toggleContainer}>
               <TouchableOpacity style={[styles.toggleButton, !isCoach && styles.toggleButtonActive]} onPress={() => setIsCoach(false)}>
                 <Text style={[styles.toggleText, !isCoach && styles.toggleTextActive]}>Client</Text>
@@ -80,7 +89,6 @@ const RegisterScreen = () => {
               <Input label="Full Name" placeholder="e.g. John Doe" autoCapitalize="words" value={name} onChangeText={setName} />
               <Input label="Email Address" placeholder="Enter your email" keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} />
               
-              {/* Conditionally render the Specialty field only if they toggle Coach */}
               {isCoach && (
                 <Input label="Specialty" placeholder="e.g. Yoga, Weightlifting" autoCapitalize="words" value={specialty} onChangeText={setSpecialty} />
               )}
@@ -112,7 +120,6 @@ const styles = StyleSheet.create({
   title: { fontSize: theme.typography.size.xxl, fontWeight: theme.typography.weight.bold, color: colors.primary, marginBottom: theme.spacing.xs },
   subtitle: { fontSize: theme.typography.size.md, color: colors.textLight },
   
-  // Toggle Styles
   toggleContainer: { flexDirection: 'row', backgroundColor: colors.border, borderRadius: theme.borderRadius.md, padding: 4, marginBottom: theme.spacing.xl },
   toggleButton: { flex: 1, paddingVertical: theme.spacing.sm, alignItems: 'center', borderRadius: theme.borderRadius.sm },
   toggleButtonActive: { backgroundColor: colors.white, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },

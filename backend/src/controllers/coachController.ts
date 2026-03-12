@@ -157,12 +157,43 @@ export const updateCoachProfile = async (req: Request, res: Response): Promise<v
   }
 };
 
+// Add this function to your existing coachController.ts file
+// (add it alongside the other exports)
+
+// =============================================
+// NEW: Upload cover image for coach
+// =============================================
+export const uploadCoverImage = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const coachId = req.params.coachId as string;
+    
+    if (!req.file) {
+      res.status(400).json({ error: 'No image file provided.' });
+      return;
+    }
+
+    // Assuming you're using the same upload middleware (multer + supabase/s3/local)
+    // as you do for avatar uploads. The file URL comes from your upload middleware.
+    const coverImageUrl = (req.file as any).location || (req.file as any).path || req.file.filename;
+
+    const updated = await prisma.coach.update({
+      where: { id: coachId },
+      data: { coverImageUrl },
+    });
+
+    res.status(200).json({ coverImageUrl: updated.coverImageUrl });
+  } catch (error) {
+    console.error('Error uploading cover image:', error);
+    res.status(500).json({ error: 'Failed to upload cover image.' });
+  }
+};
 // =============================================
 // NEW: Check if client has active sub with coach
 // =============================================
 export const checkSubscription = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId, coachId } = req.params;
+    const userId = req.params.userId as string;
+    const coachId = req.params.coachId as string;
 
     const sub = await prisma.subscription.findFirst({
       where: {

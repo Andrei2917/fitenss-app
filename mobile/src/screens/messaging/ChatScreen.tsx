@@ -11,6 +11,7 @@ interface Message {
   content: string;
   senderType: string;
   createdAt: string;
+  read: boolean;
 }
 
 const ChatScreen = ({ route }: any) => {
@@ -30,7 +31,10 @@ const ChatScreen = ({ route }: any) => {
   useEffect(() => {
     loadMessages();
     messageApi.markAsRead(userId, coachId, senderType);
-    pollInterval.current = setInterval(loadMessages, 3000);
+    pollInterval.current = setInterval(() => {
+      loadMessages();
+      messageApi.markAsRead(userId, coachId, senderType);
+    }, 3000);
     return () => clearInterval(pollInterval.current);
   }, []);
 
@@ -60,14 +64,37 @@ const ChatScreen = ({ route }: any) => {
     }
   };
 
+  // WhatsApp-style check marks
+  const SeenIndicator = ({ isRead }: { isRead: boolean }) => (
+    <View style={seenStyles.container}>
+      {isRead ? (
+        // Double blue check — "Seen"
+        <View style={seenStyles.doubleCheck}>
+          <Ionicons name="checkmark" size={14} color="#53bdeb" style={{ marginRight: -6 }} />
+          <Ionicons name="checkmark" size={14} color="#53bdeb" />
+        </View>
+      ) : (
+        // Double grey check — "Delivered"
+        <View style={seenStyles.doubleCheck}>
+          <Ionicons name="checkmark" size={14} color="rgba(255,255,255,0.5)" style={{ marginRight: -6 }} />
+          <Ionicons name="checkmark" size={14} color="rgba(255,255,255,0.5)" />
+        </View>
+      )}
+    </View>
+  );
+
   const renderMessage = ({ item }: { item: Message }) => {
     const isMyMessage = item.senderType === senderType;
     return (
       <View style={[styles.messageBubble, isMyMessage ? styles.myMessage : styles.theirMessage]}>
         <Text style={[styles.messageText, isMyMessage && { color: colors.white }]}>{item.content}</Text>
-        <Text style={[styles.messageTime, isMyMessage && { color: 'rgba(255,255,255,0.6)' }]}>
-          {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </Text>
+        <View style={styles.messageFooter}>
+          <Text style={[styles.messageTime, isMyMessage && { color: 'rgba(255,255,255,0.6)' }]}>
+            {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </Text>
+          {/* Only show seen indicator on MY messages */}
+          {isMyMessage && <SeenIndicator isRead={item.read} />}
+        </View>
       </View>
     );
   };
@@ -123,6 +150,11 @@ const ChatScreen = ({ route }: any) => {
   );
 };
 
+const seenStyles = StyleSheet.create({
+  container: { marginLeft: 4 },
+  doubleCheck: { flexDirection: 'row', alignItems: 'center' },
+});
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -132,7 +164,8 @@ const styles = StyleSheet.create({
   myMessage: { backgroundColor: colors.primary, alignSelf: 'flex-end', borderBottomRightRadius: 4 },
   theirMessage: { backgroundColor: colors.white, alignSelf: 'flex-start', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#eee' },
   messageText: { fontSize: 15, lineHeight: 21, color: colors.text },
-  messageTime: { fontSize: 11, color: colors.textLight, marginTop: 4, alignSelf: 'flex-end' },
+  messageFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 4 },
+  messageTime: { fontSize: 11, color: colors.textLight },
 
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 100 },
   emptyText: { fontSize: 18, fontWeight: 'bold', color: colors.textLight, marginTop: 12 },

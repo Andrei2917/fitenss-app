@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator, Image, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSelector } from 'react-redux';
+import * as ImagePicker from 'expo-image-picker';
+import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { coachApi } from '../../services/api/coachApi';
 import { colors } from '../../constants/colors';
 
+const { width } = Dimensions.get('window');
+
 const EditCoachProfileScreen = ({ navigation }: any) => {
   const authState = useSelector((state: RootState) => state.auth as any);
+  const dispatch = useDispatch();
   const coach = authState.coach;
 
   const [bio, setBio] = useState('');
@@ -15,8 +19,10 @@ const EditCoachProfileScreen = ({ navigation }: any) => {
   const [price, setPrice] = useState('19.99');
   const [offerings, setOfferings] = useState<string[]>([]);
   const [newOffering, setNewOffering] = useState('');
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
 
   useEffect(() => {
     loadProfile();
@@ -28,6 +34,7 @@ const EditCoachProfileScreen = ({ navigation }: any) => {
       setBio(profile.bio || '');
       setTagline(profile.tagline || '');
       setPrice(String(profile.subscriptionPrice || 19.99));
+      setCoverImageUrl(profile.coverImageUrl || null);
       try {
         const parsed = profile.offerings ? JSON.parse(profile.offerings) : [];
         setOfferings(parsed);
@@ -36,6 +43,29 @@ const EditCoachProfileScreen = ({ navigation }: any) => {
       // Use defaults
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handlePickCoverImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setIsUploadingCover(true);
+      try {
+        const imageUri = result.assets[0].uri;
+        const newUrl = await coachApi.uploadCoverImage(coach.id, imageUri);
+        setCoverImageUrl(newUrl);
+        Alert.alert('Success', 'Cover photo updated!');
+      } catch (error: any) {
+        Alert.alert('Upload Failed', error.message || 'Something went wrong.');
+      } finally {
+        setIsUploadingCover(false);
+      }
     }
   };
 
@@ -79,6 +109,30 @@ const EditCoachProfileScreen = ({ navigation }: any) => {
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <Text style={styles.header}>Edit Your Public Profile</Text>
       <Text style={styles.subheader}>This is what clients see when they visit your profile.</Text>
+
+      {/* COVER PHOTO */}
+      <View style={styles.section}>
+        <Text style={styles.label}>Cover Photo</Text>
+        <TouchableOpacity style={styles.coverPickerContainer} onPress={handlePickCoverImage} disabled={isUploadingCover}>
+          {coverImageUrl ? (
+            <Image source={{ uri: coverImageUrl }} style={styles.coverPreview} />
+          ) : (
+            <View style={styles.coverPlaceholder}>
+              <Ionicons name="image-outline" size={40} color={colors.textLight} />
+              <Text style={styles.coverPlaceholderText}>Tap to add a cover photo</Text>
+            </View>
+          )}
+          {isUploadingCover && (
+            <View style={styles.coverUploadingOverlay}>
+              <ActivityIndicator size="large" color={colors.white} />
+              <Text style={styles.coverUploadingText}>Uploading...</Text>
+            </View>
+          )}
+          <View style={styles.coverEditBadge}>
+            <Ionicons name="camera" size={18} color={colors.white} />
+          </View>
+        </TouchableOpacity>
+      </View>
 
       {/* TAGLINE */}
       <View style={styles.section}>
@@ -130,10 +184,10 @@ const EditCoachProfileScreen = ({ navigation }: any) => {
         
         {offerings.map((item, index) => (
           <View key={index} style={styles.offeringRow}>
-            <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+            <Ionicons name="checkmark-circle" size={18} color={colors.success || '#27ae60'} />
             <Text style={styles.offeringText}>{item}</Text>
             <TouchableOpacity onPress={() => removeOffering(index)}>
-              <Ionicons name="close-circle" size={20} color={colors.error} />
+              <Ionicons name="close-circle" size={20} color={colors.error || '#e74c3c'} />
             </TouchableOpacity>
           </View>
         ))}
@@ -180,6 +234,48 @@ const styles = StyleSheet.create({
   dollarSign: { fontSize: 22, fontWeight: 'bold', color: colors.primary },
   priceInput: { flex: 1, fontSize: 20, fontWeight: 'bold', textAlign: 'center' },
   perMonth: { fontSize: 14, color: colors.textLight },
+
+  // Cover photo picker
+  coverPickerContainer: { 
+    width: '100%', 
+    height: 180, 
+    borderRadius: 16, 
+    overflow: 'hidden', 
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  coverPreview: { width: '100%', height: '100%', resizeMode: 'cover' },
+  coverPlaceholder: { 
+    width: '100%', 
+    height: '100%', 
+    backgroundColor: '#f0f0f0', 
+    justifyContent: 'center', 
+    alignItems: 'center',
+  },
+  coverPlaceholderText: { fontSize: 14, color: colors.textLight, marginTop: 8 },
+  coverUploadingOverlay: { 
+    position: 'absolute', 
+    top: 0, left: 0, right: 0, bottom: 0, 
+    backgroundColor: 'rgba(0,0,0,0.5)', 
+    justifyContent: 'center', 
+    alignItems: 'center',
+  },
+  coverUploadingText: { color: colors.white, fontSize: 14, marginTop: 8, fontWeight: '600' },
+  coverEditBadge: { 
+    position: 'absolute', 
+    bottom: 10, 
+    right: 10, 
+    backgroundColor: colors.primary, 
+    width: 36, 
+    height: 36, 
+    borderRadius: 18, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.white,
+  },
+
   offeringRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.white, padding: 12, borderRadius: 10, marginBottom: 8, borderWidth: 1, borderColor: '#eee' },
   offeringText: { flex: 1, fontSize: 14, color: colors.text },
   addRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
