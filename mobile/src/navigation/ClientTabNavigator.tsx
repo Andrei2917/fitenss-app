@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSelector } from 'react-redux';
 import * as SecureStore from 'expo-secure-store';
 
 import { ForumStackNavigator } from './ForumStackNavigator';
@@ -12,6 +14,8 @@ import ProfileScreen from '../screens/profile/ProfileScreen';
 import CompleteProfileScreen from '../screens/profile/CompleteProfileScreen';
 import ConversationsScreen from '../screens/messaging/ConversationsScreen';
 import ChatScreen from '../screens/messaging/ChatScreen';
+import { clientProfileApi } from '../services/api/profileApi';
+import { RootState } from '../store';
 import { colors } from '../constants/colors';
 
 // Profile Stack
@@ -66,18 +70,48 @@ const Tab = createBottomTabNavigator();
 const CompleteProfileBanner = () => {
   const [isProfileComplete, setIsProfileComplete] = useState(true); // assume complete by default
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
+  const authState = useSelector((state: RootState) => state.auth as any);
+  const userId = authState?.user?.id;
 
+  const checkProfileCompletion = useCallback(async () => {
+    // First check local cache
+    const localCompleted = await SecureStore.getItemAsync('profile_completed');
+    if (localCompleted === 'true') {
+      setIsProfileComplete(true);
+      return;
+    }
+
+    // If not cached, check backend
+    if (userId) {
+      try {
+        const backendCompleted = await clientProfileApi.checkProfileStatus(userId);
+        if (backendCompleted) {
+          await SecureStore.setItemAsync('profile_completed', 'true');
+        }
+        setIsProfileComplete(backendCompleted);
+      } catch {
+        setIsProfileComplete(false);
+      }
+    } else {
+      setIsProfileComplete(false);
+    }
+  }, [userId]);
+
+  // Check on mount
   useEffect(() => {
     checkProfileCompletion();
-  }, []);
+  }, [checkProfileCompletion]);
 
-  const checkProfileCompletion = async () => {
-    const completed = await SecureStore.getItemAsync('profile_completed');
-    setIsProfileComplete(completed === 'true');
-  };
+  // Re-check every time the user navigates back to any tab (e.g. after completing profile)
+  useFocusEffect(
+    useCallback(() => {
+      checkProfileCompletion();
+    }, [checkProfileCompletion])
+  );
 
-  const handleDismiss = async () => {
-    // Dismiss until next app open
+  const handleDismiss = () => {
+    // Temporarily dismiss until next app open
     setIsProfileComplete(true);
   };
 
@@ -85,7 +119,7 @@ const CompleteProfileBanner = () => {
 
   return (
     <TouchableOpacity
-      style={bannerStyles.banner}
+      style={[bannerStyles.banner, { paddingTop: insets.top + 8 }]}
       onPress={() => navigation.navigate('ProfileTab', { screen: 'CompleteProfile' })}
     >
       <View style={bannerStyles.bannerLeft}>
@@ -148,7 +182,7 @@ const bannerStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingBottom: 12,
     zIndex: 100,
   },
   bannerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },

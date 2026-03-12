@@ -7,11 +7,11 @@ const prisma = new PrismaClient();
 export const getAllPosts = async (req: Request, res: Response): Promise<void> => {
   try {
     const posts = await prisma.post.findMany({
-      orderBy: { createdAt: 'desc' }, // Newest posts at the top!
+      orderBy: { createdAt: 'desc' },
       include: {
-        user: { select: { id: true, name: true } },   // Fetch the Client's name if they wrote it
-        coach: { select: { id: true, name: true } },  // Fetch the Coach's name if they wrote it
-        _count: { select: { comments: true } }        // Get the total number of comments
+        user: { select: { id: true, name: true, profilePictureUrl: true } },
+        coach: { select: { id: true, name: true, profilePictureUrl: true } },
+        _count: { select: { comments: true } }
       }
     });
     res.status(200).json(posts);
@@ -23,19 +23,18 @@ export const getAllPosts = async (req: Request, res: Response): Promise<void> =>
 // 2. GET A SINGLE POST WITH COMMENTS
 export const getPostById = async (req: Request, res: Response): Promise<void> => {
   try {
-    // --- FIX: Explicitly cast to string so Prisma is happy ---
-    const id = req.params.id as string; 
-    
+    const id = req.params.id as string;
+
     const post = await prisma.post.findUnique({
       where: { id },
       include: {
-        user: { select: { id: true, name: true } },
-        coach: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true, profilePictureUrl: true } },
+        coach: { select: { id: true, name: true, profilePictureUrl: true } },
         comments: {
-          orderBy: { createdAt: 'asc' }, // Oldest comments at the top (chronological)
+          orderBy: { createdAt: 'asc' },
           include: {
-            user: { select: { id: true, name: true } },
-            coach: { select: { id: true, name: true } },
+            user: { select: { id: true, name: true, profilePictureUrl: true } },
+            coach: { select: { id: true, name: true, profilePictureUrl: true } },
           }
         }
       }
@@ -55,7 +54,6 @@ export const getPostById = async (req: Request, res: Response): Promise<void> =>
 // 3. CREATE A NEW POST
 export const createPost = async (req: Request, res: Response): Promise<void> => {
   try {
-    // Grab whichever ID the mobile app managed to send
     const { title, content, userId, coachId } = req.body;
     const authorId = userId || coachId;
 
@@ -64,7 +62,6 @@ export const createPost = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    // SMART DETECT: Ask the database if this ID belongs to a Coach!
     const coachProfile = await prisma.coach.findUnique({ where: { id: authorId } });
     const isCoach = !!coachProfile;
 
@@ -72,8 +69,8 @@ export const createPost = async (req: Request, res: Response): Promise<void> => 
       data: {
         title,
         content,
-        coachId: isCoach ? authorId : null, // Forces the Coach Badge!
-        userId: !isCoach ? authorId : null  // Normal Client
+        coachId: isCoach ? authorId : null,
+        userId: !isCoach ? authorId : null
       }
     });
 
@@ -95,7 +92,6 @@ export const createComment = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // SMART DETECT: Ask the database if this ID belongs to a Coach!
     const coachProfile = await prisma.coach.findUnique({ where: { id: authorId } });
     const isCoach = !!coachProfile;
 
@@ -103,8 +99,8 @@ export const createComment = async (req: Request, res: Response): Promise<void> 
       data: {
         content,
         postId,
-        coachId: isCoach ? authorId : null, // Forces the Coach Badge!
-        userId: !isCoach ? authorId : null  // Normal Client
+        coachId: isCoach ? authorId : null,
+        userId: !isCoach ? authorId : null
       }
     });
 

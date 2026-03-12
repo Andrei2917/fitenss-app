@@ -102,6 +102,7 @@ const TrainingScreen = ({ route }: any) => {
         merchantDisplayName: `${coachName}'s Academy`,
         paymentIntentClientSecret: result.clientSecret,
         defaultBillingDetails: { name: user?.name },
+        returnURL: 'fitnessapp://stripe-redirect',
       });
       if (initError) throw new Error(initError.message);
 
@@ -137,6 +138,7 @@ const TrainingScreen = ({ route }: any) => {
         merchantDisplayName: `${sub.coachName}'s Academy`,
         paymentIntentClientSecret: clientSecret,
         defaultBillingDetails: { name: user?.name },
+        returnURL: 'fitnessapp://stripe-redirect',
       });
       if (initError) throw new Error(initError.message);
 

@@ -7,8 +7,15 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
+import { useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store';
+import { RootState } from '../../store';
+import { clientProfileApi } from '../../services/api/profileApi';
 import { colors } from '../../constants/colors';
 import { theme } from '../../constants/theme';
 
@@ -24,17 +31,19 @@ const GOALS = [
 ];
 
 const CompleteProfileScreen = ({ navigation }: any) => {
-  // Profile fields
+  const authState = useSelector((state: RootState) => state.auth as any);
+  const userId = authState?.user?.id;
+
   const [sex, setSex] = useState<'male' | 'female' | null>(null);
   const [age, setAge] = useState('');
   const [height, setHeight] = useState('');
   const [weight, setWeight] = useState('');
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Calculate completion percentage
   const getCompletion = () => {
     let filled = 0;
-    const total = 5; // sex, age, height, weight, goals
+    const total = 5;
     if (sex) filled++;
     if (age.trim()) filled++;
     if (height.trim()) filled++;
@@ -51,129 +60,176 @@ const CompleteProfileScreen = ({ navigation }: any) => {
     );
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!sex || !age.trim() || !height.trim() || !weight.trim() || selectedGoals.length === 0) {
       Alert.alert('Incomplete', 'Please fill out all fields and select at least one goal.');
       return;
     }
 
-    // TODO: Send to backend when recommendation system is ready
-    Alert.alert(
-      'Profile Saved! ✅',
-      'Your preferences have been saved. We\'ll use this to personalize your experience soon!',
-      [{ text: 'OK', onPress: () => navigation.goBack() }]
-    );
+    if (!userId) {
+      Alert.alert('Error', 'Could not find your user ID. Please log in again.');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // 1. Save to backend database
+      await clientProfileApi.saveProfile(userId, {
+        sex,
+        age,
+        height,
+        weight,
+        goals: selectedGoals,
+      });
+
+      // 2. Mark profile as completed in local storage (for the banner)
+      await SecureStore.setItemAsync('profile_completed', 'true');
+
+      // 3. Show success and go back
+      Alert.alert(
+        'Profile Saved! ✅',
+        'Your preferences have been saved. We\'ll use this to personalize your experience soon!',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to save profile. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const completion = getCompletion();
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* PROGRESS DIAL */}
-      <View style={styles.dialSection}>
-        <View style={styles.dialOuter}>
-          <View style={[styles.dialInner, { borderColor: completion === 100 ? colors.success : colors.primary }]}>
-            <Text style={styles.dialPercent}>{completion}%</Text>
-            <Text style={styles.dialLabel}>Complete</Text>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: 80 }}
+      >
+        {/* PROGRESS DIAL */}
+        <View style={styles.dialSection}>
+          <View style={styles.dialOuter}>
+            <View style={[styles.dialInner, { borderColor: completion === 100 ? colors.success : colors.primary }]}>
+              <Text style={styles.dialPercent}>{completion}%</Text>
+              <Text style={styles.dialLabel}>Complete</Text>
+            </View>
+          </View>
+          <Text style={styles.dialTitle}>Complete Your Profile</Text>
+          <Text style={styles.dialSubtitle}>Help us personalize your fitness journey</Text>
+        </View>
+
+        {/* SEX SELECTOR */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Sex</Text>
+          <View style={styles.sexRow}>
+            <TouchableOpacity
+              style={[styles.sexButton, sex === 'male' && styles.sexButtonActive]}
+              onPress={() => setSex('male')}
+            >
+              <Ionicons name="male" size={24} color={sex === 'male' ? colors.white : colors.primary} />
+              <Text style={[styles.sexText, sex === 'male' && styles.sexTextActive]}>Male</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.sexButton, sex === 'female' && styles.sexButtonActive]}
+              onPress={() => setSex('female')}
+            >
+              <Ionicons name="female" size={24} color={sex === 'female' ? colors.white : colors.primary} />
+              <Text style={[styles.sexText, sex === 'female' && styles.sexTextActive]}>Female</Text>
+            </TouchableOpacity>
           </View>
         </View>
-        <Text style={styles.dialTitle}>Complete Your Profile</Text>
-        <Text style={styles.dialSubtitle}>Help us personalize your fitness journey</Text>
-      </View>
 
-      {/* SEX SELECTOR */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Sex</Text>
-        <View style={styles.sexRow}>
-          <TouchableOpacity
-            style={[styles.sexButton, sex === 'male' && styles.sexButtonActive]}
-            onPress={() => setSex('male')}
-          >
-            <Ionicons name="male" size={24} color={sex === 'male' ? colors.white : colors.primary} />
-            <Text style={[styles.sexText, sex === 'male' && styles.sexTextActive]}>Male</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.sexButton, sex === 'female' && styles.sexButtonActive]}
-            onPress={() => setSex('female')}
-          >
-            <Ionicons name="female" size={24} color={sex === 'female' ? colors.white : colors.primary} />
-            <Text style={[styles.sexText, sex === 'female' && styles.sexTextActive]}>Female</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* AGE, HEIGHT, WEIGHT */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Body Metrics</Text>
-        <View style={styles.metricsRow}>
-          <View style={styles.metricBox}>
-            <Text style={styles.metricLabel}>Age</Text>
-            <TextInput
-              style={styles.metricInput}
-              placeholder="25"
-              keyboardType="numeric"
-              value={age}
-              onChangeText={setAge}
-              maxLength={3}
-            />
-            <Text style={styles.metricUnit}>years</Text>
-          </View>
-          <View style={styles.metricBox}>
-            <Text style={styles.metricLabel}>Height</Text>
-            <TextInput
-              style={styles.metricInput}
-              placeholder="175"
-              keyboardType="numeric"
-              value={height}
-              onChangeText={setHeight}
-              maxLength={3}
-            />
-            <Text style={styles.metricUnit}>cm</Text>
-          </View>
-          <View style={styles.metricBox}>
-            <Text style={styles.metricLabel}>Weight</Text>
-            <TextInput
-              style={styles.metricInput}
-              placeholder="70"
-              keyboardType="numeric"
-              value={weight}
-              onChangeText={setWeight}
-              maxLength={3}
-            />
-            <Text style={styles.metricUnit}>kg</Text>
+        {/* AGE, HEIGHT, WEIGHT */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Body Metrics</Text>
+          <View style={styles.metricsRow}>
+            <View style={styles.metricBox}>
+              <Text style={styles.metricLabel}>Age</Text>
+              <TextInput
+                style={styles.metricInput}
+                placeholder="25"
+                placeholderTextColor="#ccc"
+                keyboardType="number-pad"
+                returnKeyType="done"
+                value={age}
+                onChangeText={setAge}
+                maxLength={3}
+              />
+              <Text style={styles.metricUnit}>years</Text>
+            </View>
+            <View style={styles.metricBox}>
+              <Text style={styles.metricLabel}>Height</Text>
+              <TextInput
+                style={styles.metricInput}
+                placeholder="175"
+                placeholderTextColor="#ccc"
+                keyboardType="number-pad"
+                returnKeyType="done"
+                value={height}
+                onChangeText={setHeight}
+                maxLength={3}
+              />
+              <Text style={styles.metricUnit}>cm</Text>
+            </View>
+            <View style={styles.metricBox}>
+              <Text style={styles.metricLabel}>Weight</Text>
+              <TextInput
+                style={styles.metricInput}
+                placeholder="70"
+                placeholderTextColor="#ccc"
+                keyboardType="number-pad"
+                returnKeyType="done"
+                value={weight}
+                onChangeText={setWeight}
+                maxLength={3}
+              />
+              <Text style={styles.metricUnit}>kg</Text>
+            </View>
           </View>
         </View>
-      </View>
 
-      {/* GOALS SECTION */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>What do you want from the app?</Text>
-        <Text style={styles.goalSubtitle}>Select all that apply</Text>
-        <View style={styles.goalsGrid}>
-          {GOALS.map((goal) => {
-            const isSelected = selectedGoals.includes(goal.id);
-            return (
-              <TouchableOpacity
-                key={goal.id}
-                style={[styles.goalChip, isSelected && styles.goalChipActive]}
-                onPress={() => toggleGoal(goal.id)}
-              >
-                <Text style={[styles.goalText, isSelected && styles.goalTextActive]}>
-                  {goal.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+        {/* GOALS SECTION */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>What do you want from the app?</Text>
+          <Text style={styles.goalSubtitle}>Select all that apply</Text>
+          <View style={styles.goalsGrid}>
+            {GOALS.map((goal) => {
+              const isSelected = selectedGoals.includes(goal.id);
+              return (
+                <TouchableOpacity
+                  key={goal.id}
+                  style={[styles.goalChip, isSelected && styles.goalChipActive]}
+                  onPress={() => toggleGoal(goal.id)}
+                >
+                  <Text style={[styles.goalText, isSelected && styles.goalTextActive]}>
+                    {goal.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
-      </View>
 
-      {/* SAVE BUTTON */}
-      <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-        <Text style={styles.saveText}>Save Profile</Text>
-      </TouchableOpacity>
-
-      <View style={{ height: 50 }} />
-    </ScrollView>
+        {/* SAVE BUTTON */}
+        <TouchableOpacity
+          style={[styles.saveButton, isSaving && { opacity: 0.6 }]}
+          onPress={handleSave}
+          disabled={isSaving}
+        >
+          {isSaving ? (
+            <ActivityIndicator color={colors.white} />
+          ) : (
+            <Text style={styles.saveText}>Save Profile</Text>
+          )}
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -204,7 +260,7 @@ const styles = StyleSheet.create({
   metricsRow: { flexDirection: 'row', gap: 12 },
   metricBox: { flex: 1, backgroundColor: colors.white, borderRadius: 12, padding: 15, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
   metricLabel: { fontSize: 12, fontWeight: 'bold', color: colors.textLight, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  metricInput: { fontSize: 28, fontWeight: 'bold', color: colors.text, textAlign: 'center', width: '100%', paddingVertical: 4 },
+  metricInput: { fontSize: 28, fontWeight: 'bold', color: colors.text, textAlign: 'center', width: '100%', paddingVertical: 8 },
   metricUnit: { fontSize: 12, color: colors.textLight, marginTop: 4 },
 
   // Goals

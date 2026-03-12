@@ -21,6 +21,14 @@ model User {
   createdAt        DateTime       @default(now())
   profilePictureUrl String?
   
+  // --- PROFILE COMPLETION FIELDS ---
+  sex              String?
+  age              Int?
+  height           Int?
+  weight           Int?
+  goals            String?        // JSON string of selected goals e.g. '["athletic","lose_weight"]'
+  profileCompleted Boolean        @default(false)
+
   // --- STRIPE UPDATE ---
   stripeCustomerId String?        @unique
 

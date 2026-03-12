@@ -9,6 +9,7 @@ import paymentRoutes from './routes/subscriptionRoutes';
 import webhookRoutes from './routes/webhookRoutes';
 import forumRoutes from './routes/forumRoutes';
 import messageRoutes from './routes/messageRoutes';  // NEW
+import profileRoutes from './routes/profileRoutes';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -27,6 +28,7 @@ app.use('/api/videos', videoRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/forum', forumRoutes);
 app.use('/api/messages', messageRoutes);  // NEW
+app.use('/api/profile', profileRoutes);
 
 app.get('/', (req: Request, res: Response) => {
   res.send('Fitness Coach API is running! 🚀');
