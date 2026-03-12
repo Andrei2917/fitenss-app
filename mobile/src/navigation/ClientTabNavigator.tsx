@@ -7,9 +7,11 @@ import { ForumStackNavigator } from './ForumStackNavigator';
 import TrainingScreen from '../screens/tabs/TrainingScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 import CompleteProfileScreen from '../screens/profile/CompleteProfileScreen';
+import ConversationsScreen from '../screens/messaging/ConversationsScreen';
+import ChatScreen from '../screens/messaging/ChatScreen';
 import { colors } from '../constants/colors';
 
-// Wrap ProfileScreen in its own stack so it can navigate to CompleteProfile
+// Profile Stack
 const ProfileStack = createNativeStackNavigator();
 const ProfileStackNavigator = () => (
   <ProfileStack.Navigator
@@ -22,6 +24,35 @@ const ProfileStackNavigator = () => (
     <ProfileStack.Screen name="ProfileMain" component={ProfileScreen} options={{ title: 'Settings' }} />
     <ProfileStack.Screen name="CompleteProfile" component={CompleteProfileScreen} options={{ title: 'Complete Profile' }} />
   </ProfileStack.Navigator>
+);
+
+// Messages Stack
+const MessagesStack = createNativeStackNavigator();
+const MessagesStackNavigator = () => (
+  <MessagesStack.Navigator
+    screenOptions={{
+      headerStyle: { backgroundColor: colors.primary },
+      headerTintColor: colors.white,
+      headerTitleStyle: { fontWeight: 'bold' },
+    }}
+  >
+    <MessagesStack.Screen name="ConversationsList" component={ConversationsScreen} options={{ title: 'Messages' }} />
+    <MessagesStack.Screen name="Chat" component={ChatScreen} options={({ route }: any) => ({ title: route.params.coachName })} />
+  </MessagesStack.Navigator>
+);
+
+// Training Stack (to accept route params from CoachProfile)
+const TrainingStack = createNativeStackNavigator();
+const TrainingStackNavigator = () => (
+  <TrainingStack.Navigator
+    screenOptions={{
+      headerStyle: { backgroundColor: colors.primary },
+      headerTintColor: colors.white,
+      headerTitleStyle: { fontWeight: 'bold' },
+    }}
+  >
+    <TrainingStack.Screen name="TrainingScreen" component={TrainingScreen} options={{ title: 'My Courses' }} />
+  </TrainingStack.Navigator>
 );
 
 const Tab = createBottomTabNavigator();
@@ -38,10 +69,11 @@ const ClientTabNavigator = () => {
           let iconName: keyof typeof Ionicons.glyphMap = 'help-circle';
 
           if (route.name === 'HomeTab') {
-            // Home icon instead of chat bubbles
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'TrainingTab') {
             iconName = focused ? 'play-circle' : 'play-circle-outline';
+          } else if (route.name === 'MessagesTab') {
+            iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
           } else if (route.name === 'ProfileTab') {
             iconName = focused ? 'settings' : 'settings-outline';
           }
@@ -56,21 +88,10 @@ const ClientTabNavigator = () => {
         },
       })}
     >
-      <Tab.Screen 
-        name="HomeTab" 
-        component={ForumStackNavigator} 
-        options={{ title: 'Home' }}  // <-- RENAMED from 'Community'
-      />
-      <Tab.Screen 
-        name="TrainingTab" 
-        component={TrainingScreen} 
-        options={{ title: 'Courses', headerShown: true, headerTitle: 'My Courses' }} 
-      />
-      <Tab.Screen 
-        name="ProfileTab" 
-        component={ProfileStackNavigator} 
-        options={{ title: 'Settings' }}  // <-- RENAMED from 'Profile'
-      />
+      <Tab.Screen name="HomeTab" component={ForumStackNavigator} options={{ title: 'Home' }} />
+      <Tab.Screen name="TrainingTab" component={TrainingStackNavigator} options={{ title: 'Courses' }} />
+      <Tab.Screen name="MessagesTab" component={MessagesStackNavigator} options={{ title: 'Messages' }} />
+      <Tab.Screen name="ProfileTab" component={ProfileStackNavigator} options={{ title: 'Settings' }} />
     </Tab.Navigator>
   );
 };

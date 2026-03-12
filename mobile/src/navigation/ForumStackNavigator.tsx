@@ -4,6 +4,7 @@ import ForumListScreen from '../screens/forum/forumListScreen';
 import PostDetailScreen from '../screens/forum/postDetailScreen';
 import FindCoachScreen from '../screens/tabs/ExploreCoachesScreen';
 import CoachProfileScreen from '../screens/profile/CoachProfileScreen';
+import ChatScreen from '../screens/messaging/ChatScreen';
 import { colors } from '../constants/colors';
 
 export type ForumStackParamList = {
@@ -16,6 +17,11 @@ export type ForumStackParamList = {
     specialty: string;
     bio?: string;
     profilePictureUrl?: string;
+  };
+  Chat: {
+    coachId: string;
+    coachName: string;
+    userId: string;
   };
 };
 
@@ -30,26 +36,11 @@ export const ForumStackNavigator = () => {
         headerTitleStyle: { fontWeight: 'bold' }
       }}
     >
-      <Stack.Screen 
-        name="ForumList" 
-        component={ForumListScreen} 
-        options={{ title: 'Home' }}  // <-- RENAMED from 'Community'
-      />
-      <Stack.Screen 
-        name="PostDetail" 
-        component={PostDetailScreen} 
-        options={({ route }) => ({ title: route.params.title })} 
-      />
-      <Stack.Screen 
-        name="FindCoach" 
-        component={FindCoachScreen} 
-        options={{ title: 'Find a Coach' }} 
-      />
-      <Stack.Screen 
-        name="CoachProfile" 
-        component={CoachProfileScreen} 
-        options={({ route }) => ({ title: route.params.coachName })} 
-      />
+      <Stack.Screen name="ForumList" component={ForumListScreen} options={{ title: 'Home' }} />
+      <Stack.Screen name="PostDetail" component={PostDetailScreen} options={({ route }) => ({ title: route.params.title })} />
+      <Stack.Screen name="FindCoach" component={FindCoachScreen} options={{ title: 'Find a Coach' }} />
+      <Stack.Screen name="CoachProfile" component={CoachProfileScreen} options={({ route }) => ({ title: route.params.coachName })} />
+      <Stack.Screen name="Chat" component={ChatScreen} options={({ route }) => ({ title: route.params.coachName })} />
     </Stack.Navigator>
   );
 };

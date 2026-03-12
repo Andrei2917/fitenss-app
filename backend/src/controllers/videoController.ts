@@ -3,14 +3,12 @@ import { Vimeo } from 'vimeo';
 import prisma from '../config/database';
 import fs from 'fs';
 
-// You will get these keys from developer.vimeo.com later!
 const client = new Vimeo(
   process.env.VIMEO_CLIENT_ID || 'YOUR_VIMEO_CLIENT_ID',
   process.env.VIMEO_CLIENT_SECRET || 'YOUR_VIMEO_CLIENT_SECRET',
   process.env.VIMEO_ACCESS_TOKEN || 'YOUR_VIMEO_ACCESS_TOKEN'
 );
 
-// Add a video via a pasted Vimeo link (No API needed!)
 export const uploadVideo = async (req: Request, res: Response): Promise<void> => {
   try {
     const { coachId, title, category } = req.body;
@@ -29,23 +27,18 @@ export const uploadVideo = async (req: Request, res: Response): Promise<void> =>
       {
         name: title || 'New Workout Video',
         description: `Category: ${category}`,
-        // --- THIS IS THE MAGIC AUTOMATION BLOCK ---
         privacy: { 
-          view: 'disable',  // This tells Vimeo: "Hide from Vimeo.com"
-          embed: 'public'   // This tells Vimeo: "Allow embedding Anywhere"
+          view: 'disable',
+          embed: 'public'
         }
-        // ------------------------------------------
       },
       async (uri: string) => {
         console.log('Vimeo Upload Successful:', uri);
-        // 1. Delete the temporary file from your server to save space
         fs.unlinkSync(file.path);
 
-        // 2. Format the Vimeo Player Link
         const videoId = uri.split('/').pop();
         const fullUrl = `https://player.vimeo.com/video/${videoId}`;
 
-        // 3. Save to Supabase
         const newVideo = await prisma.video.create({
           data: {
             coachId,
@@ -74,7 +67,6 @@ export const uploadVideo = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-// Fetch videos for a specific coach
 export const getCoachVideos = async (req: Request, res: Response): Promise<void> => {
   try {
     const coachId = req.params.coachId as string;
@@ -88,35 +80,55 @@ export const getCoachVideos = async (req: Request, res: Response): Promise<void>
   }
 }
 
-// Fetch videos and check subscription status
+// =============================================
+// UPDATED: Now returns ALL subscriptions' videos
+// grouped by coach (supports multiple coaches)
+// =============================================
 export const getClientVideos = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.params.userId as string;
 
-    // 1. Find the user's latest subscription AND get the coach's details
-    const subscription = await prisma.subscription.findFirst({
-      where: { userId: userId },
+    // Find ALL user subscriptions (not just the first one)
+    const subscriptions = await prisma.subscription.findMany({
+      where: { userId },
+      include: { coach: true },
       orderBy: { startDate: 'desc' },
-      include: { coach: true } // Tells Prisma to grab the coach's info too!
     });
 
-    if (!subscription) {
-      res.status(200).json({ status: 'none', videos: [] });
+    if (!subscriptions || subscriptions.length === 0) {
+      res.status(200).json({ subscriptions: [], status: 'none', videos: [] });
       return;
     }
 
-    // 2. Fetch the videos
-    const videos = await prisma.video.findMany({
-      where: { coachId: subscription.coachId },
-      orderBy: { createdAt: 'desc' }
-    });
+    // For each subscription, fetch videos
+    const result = [];
+    for (const sub of subscriptions) {
+      const videos = await prisma.video.findMany({
+        where: { coachId: sub.coachId },
+        orderBy: { createdAt: 'desc' },
+      });
 
-    // 3. Send back the videos AND the payment status!
+      result.push({
+        subscriptionId: sub.id,
+        status: sub.status,
+        coachId: sub.coachId,
+        coachName: sub.coach.name,
+        coachSpecialty: sub.coach.specialty,
+        endDate: sub.endDate,
+        videos,
+      });
+    }
+
+    // For backward compatibility, also return the "first" sub's data at the top level
+    const firstActive = result.find(r => r.status === 'active') || result[0];
+
     res.status(200).json({
-      status: subscription.status, // This will be 'pending' or 'active'
-      subscriptionId: subscription.id,
-      coachName: subscription.coach.name,
-      videos: videos
+      status: firstActive.status,
+      subscriptionId: firstActive.subscriptionId,
+      coachName: firstActive.coachName,
+      videos: firstActive.videos,
+      // NEW: Array of ALL subscriptions
+      subscriptions: result,
     });
   } catch (error) {
     console.error(error);
@@ -124,7 +136,6 @@ export const getClientVideos = async (req: Request, res: Response): Promise<void
   }
 };
 
-// Update a video's details
 export const updateVideo = async (req: Request, res: Response): Promise<void> => {
   try {
     const videoId = req.params.videoId as string;
@@ -142,7 +153,6 @@ export const updateVideo = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-// Delete a video
 export const deleteVideo = async (req: Request, res: Response): Promise<void> => {
   try {
     const videoId = req.params.videoId as string;    
@@ -157,17 +167,20 @@ export const deleteVideo = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-// Mock Purchase: Flips a subscription from 'pending' to 'active'
 export const purchaseSubscription = async (req: Request, res: Response): Promise<void> => {
   try {
     const { subscriptionId } = req.body;
+
+    const now = new Date();
+    const endDate = new Date(now);
+    endDate.setMonth(endDate.getMonth() + 1);
 
     const activeSub = await prisma.subscription.update({
       where: { id: subscriptionId },
       data: { 
         status: 'active',
-        startDate: new Date(),
-        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Adds 30 days!
+        startDate: now,
+        endDate: endDate,
       }
     });
 

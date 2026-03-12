@@ -2,12 +2,14 @@ import { Request, Response } from 'express';
 import Stripe from 'stripe';
 import { PrismaClient } from '@prisma/client';
 
-// Initialize Stripe with your secret key
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: '2026-02-25.clover',
 });
 const prisma = new PrismaClient();
 
+// =============================================
+// REDEEM ACCESS CODE (existing — now creates 1-month sub)
+// =============================================
 export const redeemAccessCode = async (req: Request, res: Response) => {
   try {
     const { userId, code } = req.body;
@@ -31,12 +33,17 @@ export const redeemAccessCode = async (req: Request, res: Response) => {
       },
     });
 
+    // Create subscription as PENDING with 1 month duration
+    const now = new Date();
+    const endDate = new Date(now);
+    endDate.setMonth(endDate.getMonth() + 1);
+
     await prisma.subscription.create({
       data: {
-        status: 'pending', 
+        status: 'pending',
         userId: userId,
         coachId: accessCode.coachId,
-        endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 10)),
+        endDate: endDate,
       },
     });
 
@@ -47,6 +54,78 @@ export const redeemAccessCode = async (req: Request, res: Response) => {
   }
 };
 
+// =============================================
+// NEW: DIRECT PURCHASE (no referral code needed)
+// Creates a pending subscription and returns
+// a Stripe payment intent in one step
+// =============================================
+export const purchaseDirect = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId, coachId } = req.body;
+
+    if (!userId || !coachId) {
+      res.status(400).json({ error: 'userId and coachId are required' });
+      return;
+    }
+
+    // Check if there's already an active sub
+    const existingSub = await prisma.subscription.findFirst({
+      where: { userId, coachId, status: 'active' },
+    });
+
+    if (existingSub) {
+      res.status(400).json({ error: 'You already have an active subscription with this coach.' });
+      return;
+    }
+
+    const coach = await prisma.coach.findUnique({ where: { id: coachId } });
+    if (!coach) {
+      res.status(404).json({ error: 'Coach not found' });
+      return;
+    }
+
+    // Create a PENDING subscription (1 month)
+    const now = new Date();
+    const endDate = new Date(now);
+    endDate.setMonth(endDate.getMonth() + 1);
+
+    const subscription = await prisma.subscription.create({
+      data: {
+        status: 'pending',
+        userId,
+        coachId,
+        endDate,
+      },
+    });
+
+    // Create the Stripe payment intent
+    const amountInCents = Math.round(coach.subscriptionPrice * 100);
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amountInCents,
+      currency: 'usd',
+      metadata: {
+        subscriptionId: subscription.id,
+        userId,
+        coachId,
+      },
+    });
+
+    res.status(200).json({
+      subscriptionId: subscription.id,
+      clientSecret: paymentIntent.client_secret,
+      coachName: coach.name,
+      price: coach.subscriptionPrice,
+    });
+  } catch (error: any) {
+    console.error('Direct Purchase Error:', error);
+    res.status(500).json({ error: 'Failed to create subscription.' });
+  }
+};
+
+// =============================================
+// CREATE PAYMENT INTENT (for code-based pending subs)
+// =============================================
 export const createPaymentIntent = async (req: Request, res: Response): Promise<void> => {
   try {
     const { subscriptionId } = req.body;
@@ -88,10 +167,7 @@ export const createPaymentIntent = async (req: Request, res: Response): Promise<
 };
 
 // =============================================
-// Confirm payment — called by the mobile app
-// right after presentPaymentSheet() succeeds.
-// The Stripe Payment Sheet guarantees the payment
-// went through, so we can safely activate here.
+// CONFIRM PAYMENT — Activates subscription
 // =============================================
 export const confirmPayment = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -111,19 +187,26 @@ export const confirmPayment = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    // Already active — nothing to do
     if (subscription.status === 'active') {
       res.status(200).json({ success: true, message: 'Subscription is already active.' });
       return;
     }
 
-    // Activate the subscription — presentPaymentSheet() already confirmed payment
+    // Activate and set dates to 1 month from now
+    const now = new Date();
+    const endDate = new Date(now);
+    endDate.setMonth(endDate.getMonth() + 1);
+
     const activeSub = await prisma.subscription.update({
       where: { id: subscriptionId },
-      data: { status: 'active' },
+      data: { 
+        status: 'active',
+        startDate: now,
+        endDate: endDate,
+      },
     });
 
-    console.log(`✅ Subscription ${subscriptionId} is now ACTIVE.`);
+    console.log(`✅ Subscription ${subscriptionId} is now ACTIVE (1 month).`);
     res.status(200).json({ success: true, subscription: activeSub });
   } catch (error: any) {
     console.error('Confirm Payment Error:', error);

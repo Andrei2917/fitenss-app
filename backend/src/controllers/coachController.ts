@@ -8,7 +8,12 @@ export const getAllCoaches = async (req: Request, res: Response): Promise<void> 
       select: { 
         id: true, 
         name: true, 
-        specialty: true // Add any other public fields you have!
+        specialty: true,
+        bio: true,
+        profilePictureUrl: true,
+        coverImageUrl: true,
+        tagline: true,
+        subscriptionPrice: true,
       }
     });
     res.status(200).json(coaches);
@@ -22,7 +27,6 @@ export const getAllCoaches = async (req: Request, res: Response): Promise<void> 
 export const generateAccessCode = async (req: Request, res: Response): Promise<void> => {
   try {
     const { coachId } = req.body; 
-    // Generate a random 6-character alphanumeric code
     const code = Math.random().toString(36).substring(2, 8).toUpperCase(); 
 
     const newCode = await prisma.accessCode.create({
@@ -35,14 +39,11 @@ export const generateAccessCode = async (req: Request, res: Response): Promise<v
   }
 };
 
-// =============================================
-// NEW: GET clients linked to a specific coach
-// =============================================
+// GET clients linked to a specific coach
 export const getCoachClients = async (req: Request, res: Response): Promise<void> => {
   try {
     const coachId = req.params.coachId as string;
 
-    // Find all subscriptions for this coach, and include the user's info
     const subscriptions = await prisma.subscription.findMany({
       where: { coachId },
       include: {
@@ -58,7 +59,6 @@ export const getCoachClients = async (req: Request, res: Response): Promise<void
       orderBy: { startDate: 'desc' }
     });
 
-    // Extract the unique users (a user might have multiple subscriptions)
     const uniqueClientsMap = new Map<string, any>();
     for (const sub of subscriptions) {
       if (sub.user && !uniqueClientsMap.has(sub.user.id)) {
@@ -67,7 +67,7 @@ export const getCoachClients = async (req: Request, res: Response): Promise<void
           name: sub.user.name,
           email: sub.user.email,
           profilePictureUrl: sub.user.profilePictureUrl,
-          status: sub.status, // 'pending' or 'active'
+          status: sub.status,
           linkedAt: sub.startDate,
         });
       }
@@ -81,9 +81,7 @@ export const getCoachClients = async (req: Request, res: Response): Promise<void
   }
 };
 
-// =============================================
-// NEW: GET access codes for a specific coach
-// =============================================
+// GET access codes for a specific coach
 export const getCoachAccessCodes = async (req: Request, res: Response): Promise<void> => {
   try {
     const coachId = req.params.coachId as string;
@@ -99,3 +97,85 @@ export const getCoachAccessCodes = async (req: Request, res: Response): Promise<
     res.status(500).json({ error: 'Failed to fetch access codes.' });
   }
 };
+
+// =============================================
+// NEW: GET full coach public profile
+// =============================================
+export const getCoachProfile = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const coachId = req.params.coachId as string;
+
+    const coach = await prisma.coach.findUnique({
+      where: { id: coachId },
+      select: {
+        id: true,
+        name: true,
+        specialty: true,
+        bio: true,
+        profilePictureUrl: true,
+        coverImageUrl: true,
+        tagline: true,
+        offerings: true,
+        subscriptionPrice: true,
+      }
+    });
+
+    if (!coach) {
+      res.status(404).json({ error: 'Coach not found' });
+      return;
+    }
+
+    res.status(200).json(coach);
+  } catch (error) {
+    console.error('Error fetching coach profile:', error);
+    res.status(500).json({ error: 'Failed to fetch coach profile.' });
+  }
+};
+
+// =============================================
+// NEW: UPDATE coach profile (for Settings page)
+// =============================================
+export const updateCoachProfile = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const coachId = req.params.coachId as string;
+    const { bio, tagline, offerings, subscriptionPrice } = req.body;
+
+    const updated = await prisma.coach.update({
+      where: { id: coachId },
+      data: {
+        ...(bio !== undefined && { bio }),
+        ...(tagline !== undefined && { tagline }),
+        ...(offerings !== undefined && { offerings }),
+        ...(subscriptionPrice !== undefined && { subscriptionPrice: parseFloat(subscriptionPrice) }),
+      },
+    });
+
+    res.status(200).json(updated);
+  } catch (error) {
+    console.error('Error updating coach profile:', error);
+    res.status(500).json({ error: 'Failed to update profile.' });
+  }
+};
+
+// =============================================
+// NEW: Check if client has active sub with coach
+// =============================================
+export const checkSubscription = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId, coachId } = req.params;
+
+    const sub = await prisma.subscription.findFirst({
+      where: {
+        userId,
+        coachId,
+        status: 'active',
+      },
+    });
+
+    res.status(200).json({ isSubscribed: !!sub });
+  } catch (error) {
+    console.error('Error checking subscription:', error);
+    res.status(500).json({ error: 'Failed to check subscription.' });
+  }
+};
+
