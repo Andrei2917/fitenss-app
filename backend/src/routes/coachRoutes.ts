@@ -11,8 +11,8 @@ import {
   uploadCoverImage
 } from '../controllers/coachController';
 
-const upload = multer({ dest: 'uploads/' });
-
+// Use memory storage so the file buffer is available for Cloudinary upload
+const upload = multer({ storage: multer.memoryStorage() });
 
 const router = Router();
 router.get('/', getAllCoaches);
@@ -25,7 +25,7 @@ router.get('/:coachId/codes', getCoachAccessCodes);
 router.get('/:coachId/profile', getCoachProfile);
 router.put('/:coachId/profile', updateCoachProfile);
 
-// NEW: Cover image upload
+// Cover image upload (uses memory storage → Cloudinary)
 router.post('/:coachId/cover-image', upload.single('coverImage'), uploadCoverImage);
 
 // Check if a user is subscribed to a specific coach

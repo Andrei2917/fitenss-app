@@ -1,5 +1,12 @@
 import { Request, Response } from 'express';
 import prisma from '../config/database';
+import { v2 as cloudinary } from 'cloudinary';
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 // GET: Fetch all coaches for the Explore Tab
 export const getAllCoaches = async (req: Request, res: Response): Promise<void> => {
@@ -166,16 +173,25 @@ export const updateCoachProfile = async (req: Request, res: Response): Promise<v
 export const uploadCoverImage = async (req: Request, res: Response): Promise<void> => {
   try {
     const coachId = req.params.coachId as string;
-    
+
     if (!req.file) {
       res.status(400).json({ error: 'No image file provided.' });
       return;
     }
 
-    // Assuming you're using the same upload middleware (multer + supabase/s3/local)
-    // as you do for avatar uploads. The file URL comes from your upload middleware.
-    const coverImageUrl = (req.file as any).location || (req.file as any).path || req.file.filename;
+    // Convert the file buffer to base64 and upload to Cloudinary
+    // (same approach as avatar upload in uploadController.ts)
+    const b64 = Buffer.from(req.file.buffer).toString('base64');
+    const dataURI = 'data:' + req.file.mimetype + ';base64,' + b64;
 
+    const uploadResult = await cloudinary.uploader.upload(dataURI, {
+      folder: 'fitness-app/covers',
+      transformation: [{ width: 1200, height: 600, crop: 'fill', gravity: 'auto' }],
+    });
+
+    const coverImageUrl = uploadResult.secure_url;
+
+    // Save the Cloudinary URL to the database
     const updated = await prisma.coach.update({
       where: { id: coachId },
       data: { coverImageUrl },
