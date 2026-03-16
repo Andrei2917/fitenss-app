@@ -1,184 +1,179 @@
-import React, { useRef, useEffect } from 'react';
-import {
-  View,
-  TouchableOpacity,
-  Text,
-  StyleSheet,
-  Animated,
-  Platform,
-} from 'react-native';
+import React from 'react';
+import { View, Text, Pressable, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-interface TabItem {
-  name: string;
+type TabKey = 'home' | 'courses' | 'messages' | 'settings';
+type IconName = keyof typeof Ionicons.glyphMap;
+
+type TabItem = {
+  key: TabKey;
   label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  iconFocused: keyof typeof Ionicons.glyphMap;
-}
+  icon: IconName;
+};
 
-interface Props {
-  state: any;
-  descriptors: any;
-  navigation: any;
-  tabs: TabItem[];
-}
+const TABS: TabItem[] = [
+  { key: 'home', label: 'Home', icon: 'home' as IconName },
+  { key: 'courses', label: 'Courses', icon: 'play-circle-outline' as IconName },
+  { key: 'messages', label: 'Messages', icon: 'chatbubble-ellipses-outline' as IconName },
+  { key: 'settings', label: 'Settings', icon: 'settings-outline' as IconName },
+];
 
-const LiquidGlassTabBar = ({ state, descriptors, navigation, tabs }: Props) => {
-  const insets = useSafeAreaInsets();
 
-  const scaleAnims = useRef(tabs.map(() => new Animated.Value(1))).current;
-  const translateYAnims = useRef(tabs.map(() => new Animated.Value(0))).current;
-  const pillAnims = useRef(tabs.map((_, i) => new Animated.Value(i === 0 ? 1 : 0))).current;
+type Props = {
+  active: TabKey;
+  onChange: (key: TabKey) => void;
+};
 
-  useEffect(() => {
-    tabs.forEach((_, index) => {
-      const isActive = index === state.index;
-      Animated.parallel([
-        Animated.spring(scaleAnims[index], {
-          toValue: isActive ? 1.08 : 1,
-          useNativeDriver: true,
-          tension: 180,
-          friction: 10,
-        }),
-        Animated.spring(translateYAnims[index], {
-          toValue: isActive ? -2 : 0,
-          useNativeDriver: true,
-          tension: 180,
-          friction: 10,
-        }),
-        Animated.timing(pillAnims[index], {
-          toValue: isActive ? 1 : 0,
-          duration: 180,
-          useNativeDriver: false,
-        }),
-      ]).start();
-    });
-  }, [state.index]);
-
+export const LiquidGlassTabBar: React.FC<Props> = ({ active, onChange }) => {
   return (
-    <View style={[styles.wrapper, { paddingBottom: Math.max(insets.bottom, 6) }]}>
-      <View style={styles.bar}>
-        {tabs.map((tab, index) => {
-          const isFocused = state.index === index;
-          const route = state.routes[index];
-          const descriptor = descriptors[route?.key];
-          const label = descriptor?.options?.title ?? tab.label;
-
-          const pillScale = pillAnims[index].interpolate({
-            inputRange: [0, 1],
-            outputRange: [0.7, 1],
-          });
-          const pillOpacity = pillAnims[index].interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, 1],
-          });
-
-          const onPress = () => {
-            const event = navigation.emit({
-              type: 'tabPress',
-              target: route?.key,
-              canPreventDefault: true,
-            });
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route?.name ?? tab.name);
-            }
-          };
-
-          return (
-            <TouchableOpacity
-              key={tab.name}
-              onPress={onPress}
-              style={styles.tab}
-              activeOpacity={0.7}
-            >
-              <Animated.View
-                style={[
-                  styles.iconArea,
-                  {
-                    transform: [
-                      { scale: scaleAnims[index] },
-                      { translateY: translateYAnims[index] },
-                    ],
-                  },
+    <View style={styles.wrapper} pointerEvents="box-none">
+      <BlurView intensity={60} tint="light" style={styles.blurCard}>
+        <LinearGradient
+          colors={['rgba(255,255,255,0.65)', 'rgba(255,255,255,0.25)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.gradient}
+        />
+        <View style={styles.row}>
+          {TABS.map((tab) => {
+            const isActive = tab.key === active;
+            return (
+              <Pressable
+                key={tab.key}
+                onPress={() => onChange(tab.key)}
+                style={({ pressed }) => [
+                  styles.item,
+                  isActive && styles.itemActive,
+                  pressed && styles.itemPressed,
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel={tab.label}
+                accessibilityState={{ selected: isActive }}
               >
-                {/* Active pill */}
-                <Animated.View
+                <View style={[styles.iconCircle, isActive && styles.iconCircleActive]}>
+                  <Ionicons
+                    name={tab.icon}
+                    size={22}
+                    color={isActive ? tokens.color.primary700 : tokens.color.iconDefault}
+                  />
+                </View>
+                <Text
                   style={[
-                    styles.pill,
-                    {
-                      opacity: pillOpacity,
-                      transform: [{ scale: pillScale }],
-                    },
+                    styles.label,
+                    { color: isActive ? tokens.color.primary700 : tokens.color.textSecondary },
                   ]}
-                />
-
-                <Ionicons
-                  name={isFocused ? tab.iconFocused : tab.icon}
-                  size={23}
-                  color={isFocused ? '#21277B' : '#9CA3AF'}
-                />
-              </Animated.View>
-
-              <Text style={[styles.label, isFocused ? styles.labelOn : styles.labelOff]}>
-                {label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+                >
+                  {tab.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </BlurView>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+/* Design tokens (tweak here first) */
+const tokens = {
+  radius: {
+    glass: 28,
+    icon: 22,
+  },
+  spacing: {
+    cardPadding: 12,
+    gap: 10,
+    iconGap: 8,
+  },
+  color: {
+    primary700: '#2F2D87', // matches your header/nav hue
+    iconDefault: '#3C3C55',
+    textSecondary: '#444B59',
+    shadow: 'rgba(20, 24, 45, 0.18)',
+    innerShadow: 'rgba(255, 255, 255, 0.5)',
+    border: 'rgba(255,255,255,0.35)',
+  },
+  blur: 60,
+};
+
+type Styles = {
+  wrapper: ViewStyle;
+  blurCard: ViewStyle;
+  gradient: ViewStyle;
+  row: ViewStyle;
+  item: ViewStyle;
+  itemActive: ViewStyle;
+  itemPressed: ViewStyle;
+  iconCircle: ViewStyle;
+  iconCircleActive: ViewStyle;
+  label: TextStyle;
+};
+
+const styles = StyleSheet.create<Styles>({
   wrapper: {
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.07)',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
-      },
-      android: { elevation: 16 },
-    }),
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: 18,
   },
-  bar: {
+  blurCard: {
+    borderRadius: tokens.radius.glass,
+    overflow: 'hidden',
+    padding: tokens.spacing.cardPadding,
+    borderWidth: 1,
+    borderColor: tokens.color.border,
+    shadowColor: tokens.color.shadow,
+    shadowOpacity: 1,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  gradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  row: {
     flexDirection: 'row',
-    paddingTop: 8,
-    paddingHorizontal: 8,
+    justifyContent: 'space-between',
+    gap: tokens.spacing.gap,
   },
-  tab: {
+  item: {
     flex: 1,
     alignItems: 'center',
-    paddingBottom: 4,
+    gap: tokens.spacing.iconGap / 2,
+    paddingVertical: 8,
+    borderRadius: tokens.radius.icon * 1.4,
   },
-  iconArea: {
-    width: 48,
-    height: 34,
+  itemActive: {
+    backgroundColor: 'rgba(47,45,135,0.12)', // subtle highlight
+    shadowColor: tokens.color.innerShadow,
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  itemPressed: {
+    transform: [{ translateY: 1 }],
+    opacity: 0.9,
+  },
+  iconCircle: {
+    width: tokens.radius.icon * 2,
+    height: tokens.radius.icon * 2,
+    borderRadius: tokens.radius.icon,
+    backgroundColor: 'rgba(255,255,255,0.55)',
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
+    borderWidth: 1,
+    borderColor: tokens.color.border,
   },
-  pill: {
-    position: 'absolute',
-    width: 48,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(33,39,123,0.10)',
+  iconCircleActive: {
+    backgroundColor: 'rgba(47,45,135,0.14)',
+    borderColor: 'rgba(47,45,135,0.35)',
   },
   label: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '600',
-    marginTop: 2,
-    letterSpacing: 0.1,
   },
-  labelOn: { color: '#21277B' },
-  labelOff: { color: '#9CA3AF' },
 });
 
 export default LiquidGlassTabBar;

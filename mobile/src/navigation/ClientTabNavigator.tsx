@@ -7,7 +7,6 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import * as SecureStore from 'expo-secure-store';
-import LiquidGlassTabBar from '../components/navigation/LiquidGlassTabBar';
 
 import { ForumStackNavigator } from './ForumStackNavigator';
 import TrainingScreen from '../screens/tabs/TrainingScreen';
@@ -134,20 +133,38 @@ const CompleteProfileBanner = () => {
   );
 };
 
-const CLIENT_TABS = [
-  { name: 'HomeTab',     label: 'Home',     icon: 'home-outline' as const,         iconFocused: 'home' as const },
-  { name: 'TrainingTab', label: 'Courses',  icon: 'play-circle-outline' as const,  iconFocused: 'play-circle' as const },
-  { name: 'MessagesTab', label: 'Messages', icon: 'chatbubbles-outline' as const,  iconFocused: 'chatbubbles' as const },
-  { name: 'ProfileTab',  label: 'Settings', icon: 'settings-outline' as const,     iconFocused: 'settings' as const },
-];
-
 const ClientTabNavigator = () => {
   return (
     <View style={{ flex: 1 }}>
       <CompleteProfileBanner />
       <Tab.Navigator
-        tabBar={(props) => <LiquidGlassTabBar {...props} tabs={CLIENT_TABS} />}
-        screenOptions={{ headerShown: false }}
+        screenOptions={({ route }) => ({
+          tabBarActiveTintColor: colors.primary,
+          tabBarInactiveTintColor: colors.textLight,
+          headerShown: false,
+          
+          tabBarIcon: ({ focused, color, size }) => {
+            let iconName: keyof typeof Ionicons.glyphMap = 'help-circle';
+
+            if (route.name === 'HomeTab') {
+              iconName = focused ? 'home' : 'home-outline';
+            } else if (route.name === 'TrainingTab') {
+              iconName = focused ? 'play-circle' : 'play-circle-outline';
+            } else if (route.name === 'MessagesTab') {
+              iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+            } else if (route.name === 'ProfileTab') {
+              iconName = focused ? 'settings' : 'settings-outline';
+            }
+
+            return <Ionicons name={iconName} size={size + 2} color={color} />;
+          },
+          
+          tabBarStyle: {
+            paddingBottom: 5,
+            paddingTop: 5,
+            height: 60,
+          },
+        })}
       >
         <Tab.Screen name="HomeTab" component={ForumStackNavigator} options={{ title: 'Home' }} />
         <Tab.Screen name="TrainingTab" component={TrainingStackNavigator} options={{ title: 'Courses' }} />
