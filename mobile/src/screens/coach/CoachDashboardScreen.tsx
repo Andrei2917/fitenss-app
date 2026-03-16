@@ -1,191 +1,242 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, RefreshControl } from 'react-native';
-import * as Clipboard from 'expo-clipboard'; // Use Expo's clipboard for modern React Native
+import {
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  ActivityIndicator, Alert, RefreshControl, Platform, StatusBar,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { coachApi } from '../../services/api/coachApi'; 
-import { colors } from '../../constants/colors';
-import { theme } from '../../constants/theme';
-import { Ionicons } from '@expo/vector-icons';
+import { coachApi } from '../../services/api/coachApi';
 
-const CoachDashboardScreen = () => {
+export default function CoachDashboardScreen() {
   const coach = useSelector((state: RootState) => state.auth.coach);
-  
+
   const [clients, setClients] = useState<any[]>([]);
-  const [accessCodes, setAccessCodes] = useState<any[]>([]);
-  
-  const [isLoading, setIsLoading] = useState(true);
+  const [codes, setCodes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
-  // Fetch the Clients (and codes if you add that backend route later!)
-  const fetchDashboardData = async () => {
+  const fetchData = async () => {
     if (!coach?.id) return;
     try {
-      // If you have a getClients method, it will load them here. 
-      // (Wrapped in a check just in case it's not fully built yet)
-      if (coachApi.getClients) {
-        const clientsData = await coachApi.getClients(coach.id);
-        setClients(clientsData);
-      }
-      
-      // If you build a getAccessCodes method later, uncomment this:
-      if (coachApi.getAccessCodes) {
-        const codesData = await coachApi.getAccessCodes(coach.id);
-        setAccessCodes(codesData);
-      }
-      
-    } catch (error: any) {
-      console.error('Error fetching dashboard data:', error);
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
+      if (coachApi.getClients) setClients(await coachApi.getClients(coach.id));
+      if (coachApi.getAccessCodes) setCodes(await coachApi.getAccessCodes(coach.id));
+    } catch { /* silent */ }
+    finally { setLoading(false); setRefreshing(false); }
   };
 
-  useEffect(() => { fetchDashboardData(); }, []);
-  const onRefresh = () => { setRefreshing(true); fetchDashboardData(); };
+  useEffect(() => { fetchData(); }, []);
 
-  // THE WIRED-UP GENERATOR FUNCTION
-  // THE WIRED-UP GENERATOR FUNCTION
-  const handleGenerateCode = async () => {
+  const generateCode = async () => {
     if (!coach?.id) return;
-    setIsGenerating(true);
+    setGenerating(true);
     try {
-      // The API returns the FULL object from the database, not just a string!
-      const newCodeObj = await coachApi.generateAccessCode(coach.id);
-      
-      // Since it's already a perfect object, we just add it straight to the list!
-      setAccessCodes(prevCodes => [newCodeObj, ...prevCodes]);
-      
-      Alert.alert('Success', 'New access code generated!');
-      
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to generate code.');
-    } finally {
-      setIsGenerating(false);
-    }
+      const code = await coachApi.generateAccessCode(coach.id);
+      setCodes(prev => [code, ...prev]);
+      Alert.alert('Code Created', 'New access code is ready to share!');
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to generate code.');
+    } finally { setGenerating(false); }
   };
 
-  const copyToClipboard = async (code: string) => {
+  const copyCode = async (code: string) => {
     await Clipboard.setStringAsync(code);
-    Alert.alert('Copied!', `Access code ${code} copied to clipboard.`);
+    Alert.alert('Copied!', `"${code}" copied to clipboard.`);
   };
 
-  // --- UI: THE NEW ACCESS CODES SECTION ---
-  const renderHeader = () => (
-    <View style={styles.headerContainer}>
-      <Text style={styles.pageTitle}>Dashboard</Text>
-      
-      <View style={styles.codesCard}>
-        <View style={styles.codesHeaderRow}>
-          <Text style={styles.sectionTitle}>Access Codes</Text>
-          <TouchableOpacity 
-            style={styles.generateBtn} 
-            onPress={handleGenerateCode}
-            disabled={isGenerating}
-          >
-            {isGenerating ? <ActivityIndicator size="small" color={colors.white} /> : <Text style={styles.generateBtnText}>+ New Code</Text>}
+  const renderClient = ({ item }: { item: any }) => (
+    <View style={S.clientCard}>
+      <LinearGradient colors={['#21277B', '#4A6FA5']} style={S.clientAvatar}>
+        <Text style={S.clientInitial}>{item.name?.charAt(0)?.toUpperCase() || 'C'}</Text>
+      </LinearGradient>
+      <View style={S.clientInfo}>
+        <Text style={S.clientName}>{item.name}</Text>
+        <Text style={S.clientEmail}>{item.email}</Text>
+      </View>
+      <View style={S.activeChip}>
+        <View style={S.activeDot} />
+        <Text style={S.activeText}>Active</Text>
+      </View>
+    </View>
+  );
+
+  if (loading) return (
+    <View style={S.loader}><ActivityIndicator size="large" color="#21277B" /></View>
+  );
+
+  const Header = () => (
+    <View>
+      {/* Stats row */}
+      <View style={S.statsRow}>
+        <View style={S.statCard}>
+          <Text style={S.statNum}>{clients.length}</Text>
+          <Text style={S.statLabel}>Clients</Text>
+        </View>
+        <View style={[S.statCard, S.statCardMid]}>
+          <Text style={S.statNum}>{codes.filter(c => !c.usedAt).length}</Text>
+          <Text style={S.statLabel}>Active Codes</Text>
+        </View>
+        <View style={S.statCard}>
+          <Text style={S.statNum}>{codes.filter(c => c.usedAt).length}</Text>
+          <Text style={S.statLabel}>Redeemed</Text>
+        </View>
+      </View>
+
+      {/* Access Codes */}
+      <View style={S.section}>
+        <View style={S.sectionHeader}>
+          <View>
+            <Text style={S.sectionTitle}>Access Codes</Text>
+            <Text style={S.sectionSub}>Share with clients to bypass paywall</Text>
+          </View>
+          <TouchableOpacity style={S.genBtn} onPress={generateCode} disabled={generating} activeOpacity={0.85}>
+            {generating
+              ? <ActivityIndicator size="small" color="#fff" />
+              : (
+                <>
+                  <Ionicons name="add" size={16} color="#fff" />
+                  <Text style={S.genBtnText}>New Code</Text>
+                </>
+              )
+            }
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.codesSubtext}>Give these codes to your real-life clients so they can bypass the paywall.</Text>
-
-        {accessCodes.length === 0 ? (
-           <Text style={styles.emptyCodesText}>No access codes generated yet.</Text>
-        ) : (
-          <FlatList 
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            data={accessCodes}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <TouchableOpacity 
-                style={[styles.codePill, item.usedAt ? styles.codePillUsed : styles.codePillActive]}
-                onPress={() => !item.usedAt && copyToClipboard(item.code)}
-              >
-                <Text style={[styles.codeText, item.usedAt && styles.codeTextUsed]}>
-                  {item.code}
-                </Text>
-                <View style={[styles.statusBadge, item.usedAt ? styles.badgeUsed : styles.badgeActive]}>
-                  <Text style={styles.badgeText}>{item.usedAt ? 'USED' : 'ACTIVE'}</Text>
-                </View>
-              </TouchableOpacity>
-            )}
-          />
-        )}
+        {codes.length === 0
+          ? (
+            <View style={S.emptyCodeWrap}>
+              <Ionicons name="key-outline" size={28} color="#C4C9D4" />
+              <Text style={S.emptyCodeText}>No codes yet — tap New Code to generate one</Text>
+            </View>
+          )
+          : (
+            <FlatList
+              horizontal showsHorizontalScrollIndicator={false}
+              data={codes} keyExtractor={i => i.id}
+              contentContainerStyle={{ gap: 10, paddingVertical: 4 }}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[S.codePill, item.usedAt && S.codePillUsed]}
+                  onPress={() => !item.usedAt && copyCode(item.code)}
+                  activeOpacity={item.usedAt ? 1 : 0.8}
+                >
+                  <Text style={[S.codeValue, item.usedAt && S.codeValueUsed]}>{item.code}</Text>
+                  <View style={[S.codeStatus, item.usedAt ? S.codeStatusUsed : S.codeStatusActive]}>
+                    <Text style={S.codeStatusText}>{item.usedAt ? 'USED' : 'ACTIVE'}</Text>
+                  </View>
+                  {!item.usedAt && (
+                    <Ionicons name="copy-outline" size={14} color="#21277B" style={{ marginLeft: 6 }} />
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          )
+        }
       </View>
 
-      <Text style={styles.sectionTitleClient}>My Clients ({clients?.length || 0})</Text>
+      {/* Clients header */}
+      <View style={S.clientsHeader}>
+        <Text style={S.sectionTitle}>My Clients</Text>
+        <View style={S.countPill}>
+          <Text style={S.countText}>{clients.length}</Text>
+        </View>
+      </View>
     </View>
   );
-
-  // --- UI: THE CLIENT LIST ---
-  const renderClient = ({ item }: { item: any }) => (
-    <View style={styles.clientCard}>
-      <View style={styles.clientAvatar}>
-        <Text style={styles.avatarText}>{item.name?.charAt(0)?.toUpperCase() || 'C'}</Text>
-      </View>
-      <View style={styles.clientInfo}>
-        <Text style={styles.clientName}>{item.name}</Text>
-        <Text style={styles.clientEmail}>{item.email}</Text>
-      </View>
-      <Ionicons name="chevron-forward" size={20} color={colors.textLight} />
-    </View>
-  );
-
-  if (isLoading) return <ActivityIndicator size="large" color={colors.primary} style={styles.centered} />;
 
   return (
-    <View style={styles.container}>
+    <View style={S.root}>
+      <StatusBar barStyle="light-content" />
+      <LinearGradient colors={['#21277B', '#2E3596']} style={S.hero}>
+        <Text style={S.heroTitle}>Dashboard</Text>
+        <Text style={S.heroSub}>Welcome back, {coach?.name?.split(' ')[0] || 'Coach'} 👋</Text>
+        <View style={S.heroCurve} />
+      </LinearGradient>
+
       <FlatList
-        data={clients}
-        keyExtractor={(item) => item.id}
+        data={clients} keyExtractor={i => i.id}
         renderItem={renderClient}
-        ListHeaderComponent={renderHeader}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        contentContainerStyle={{ paddingBottom: 100 }}
-        ListEmptyComponent={<Text style={styles.emptyClientsText}>You don't have any linked clients yet.</Text>}
+        ListHeaderComponent={<Header />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(); }} tintColor="#21277B" />}
+        contentContainerStyle={S.list}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={S.emptyClients}>
+            <View style={S.emptyIcon}>
+              <Ionicons name="people-outline" size={32} color="#21277B" />
+            </View>
+            <Text style={S.emptyTitle}>No clients yet</Text>
+            <Text style={S.emptySub}>Share an access code to get started</Text>
+          </View>
+        }
       />
     </View>
   );
-};
+}
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  
-  headerContainer: { padding: theme.spacing.lg },
-  pageTitle: { fontSize: 28, fontWeight: 'bold', color: colors.primary, marginBottom: 20 },
-  
-  codesCard: { backgroundColor: colors.white, padding: 20, borderRadius: 16, marginBottom: 30, elevation: 3, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10 },
-  codesHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: colors.text },
-  codesSubtext: { fontSize: 14, color: colors.textLight, marginBottom: 15, lineHeight: 20 },
-  
-  generateBtn: { backgroundColor: colors.primary, paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20 },
-  generateBtnText: { color: colors.white, fontWeight: 'bold', fontSize: 13 },
-  
-  emptyCodesText: { color: colors.textLight, fontStyle: 'italic', marginTop: 10 },
-  
-  codePill: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, marginRight: 15, borderWidth: 1 },
-  codePillActive: { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' },
-  codePillUsed: { backgroundColor: '#f9fafb', borderColor: '#e5e7eb' },
-  codeText: { fontSize: 18, fontWeight: 'bold', letterSpacing: 2, marginRight: 15, color: colors.text },
-  codeTextUsed: { color: colors.textLight, textDecorationLine: 'line-through' },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  badgeActive: { backgroundColor: '#22c55e' },
-  badgeUsed: { backgroundColor: '#9ca3af' },
-  badgeText: { color: colors.white, fontSize: 10, fontWeight: 'bold' },
-
-  sectionTitleClient: { fontSize: 18, fontWeight: 'bold', color: colors.text, marginBottom: 15, paddingHorizontal: theme.spacing.lg },
-  clientCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, padding: 15, marginHorizontal: theme.spacing.lg, marginBottom: 10, borderRadius: 12, elevation: 1 },
-  clientAvatar: { width: 45, height: 45, borderRadius: 22.5, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
-  avatarText: { color: colors.white, fontSize: 20, fontWeight: 'bold' },
-  clientInfo: { flex: 1 },
-  clientName: { fontSize: 16, fontWeight: 'bold', color: colors.text },
-  clientEmail: { fontSize: 14, color: colors.textLight },
-  emptyClientsText: { textAlign: 'center', color: colors.textLight, marginTop: 20, paddingHorizontal: 20 },
+const CARD_SHADOW = Platform.select({
+  ios: { shadowColor: '#21277B', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.07, shadowRadius: 10 },
+  android: { elevation: 3 },
 });
 
-export default CoachDashboardScreen;
+const S = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#F2F4FA' },
+  loader: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F2F4FA' },
+  list: { paddingBottom: 32 },
+
+  hero: { paddingTop: 56, paddingBottom: 36, paddingHorizontal: 20 },
+  heroTitle: { fontSize: 30, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },
+  heroSub: { fontSize: 13, color: 'rgba(255,255,255,0.65)', marginTop: 3 },
+  heroCurve: { position: 'absolute', bottom: -1, left: 0, right: 0, height: 20, backgroundColor: '#F2F4FA', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+
+  statsRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginTop: 8, marginBottom: 16 },
+  statCard: { flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 14, alignItems: 'center', ...CARD_SHADOW },
+  statCardMid: { borderWidth: 1.5, borderColor: '#DADEFD', backgroundColor: '#F7F8FF' },
+  statNum: { fontSize: 24, fontWeight: '800', color: '#21277B', letterSpacing: -0.5 },
+  statLabel: { fontSize: 11, color: '#9CA3AF', fontWeight: '600', marginTop: 2 },
+
+  section: { backgroundColor: '#fff', borderRadius: 16, marginHorizontal: 16, marginBottom: 16, padding: 16, ...CARD_SHADOW },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#0D1117' },
+  sectionSub: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
+  genBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#21277B', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20,
+    ...Platform.select({ ios: { shadowColor: '#21277B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }, android: { elevation: 6 } }),
+  },
+  genBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+
+  emptyCodeWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
+  emptyCodeText: { flex: 1, fontSize: 13, color: '#9CA3AF', lineHeight: 18 },
+
+  codePill: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F7FFF9', borderWidth: 1.5, borderColor: '#A7F3D0', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10 },
+  codePillUsed: { backgroundColor: '#F9FAFB', borderColor: '#E5E7EB' },
+  codeValue: { fontSize: 17, fontWeight: '800', letterSpacing: 2, color: '#0D1117', marginRight: 10 },
+  codeValueUsed: { color: '#9CA3AF', textDecorationLine: 'line-through' },
+  codeStatus: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
+  codeStatusActive: { backgroundColor: '#10B981' },
+  codeStatusUsed: { backgroundColor: '#9CA3AF' },
+  codeStatusText: { color: '#fff', fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+
+  clientsHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, marginBottom: 10 },
+  countPill: { backgroundColor: '#EEF1FF', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10 },
+  countText: { fontSize: 12, color: '#21277B', fontWeight: '700' },
+
+  clientCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, marginHorizontal: 16, marginBottom: 10, padding: 14, ...CARD_SHADOW },
+  clientAvatar: { width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
+  clientInitial: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  clientInfo: { flex: 1 },
+  clientName: { fontSize: 15, fontWeight: '700', color: '#0D1117' },
+  clientEmail: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
+  activeChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#F0FDF4', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
+  activeDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#10B981' },
+  activeText: { fontSize: 11, color: '#10B981', fontWeight: '700' },
+
+  emptyClients: { alignItems: 'center', paddingTop: 32, paddingHorizontal: 40 },
+  emptyIcon: { width: 68, height: 68, borderRadius: 34, backgroundColor: 'rgba(33,39,123,0.08)', justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: '#0D1117', marginBottom: 4 },
+  emptySub: { fontSize: 13, color: '#9CA3AF', textAlign: 'center' },
+});

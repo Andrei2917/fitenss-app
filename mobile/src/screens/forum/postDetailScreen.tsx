@@ -1,209 +1,199 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, Image } from 'react-native';
+import {
+  View, Text, StyleSheet, FlatList, ActivityIndicator, TextInput,
+  TouchableOpacity, KeyboardAvoidingView, Platform, Alert, Image, StatusBar,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { forumApi } from '../../services/api/forumApi';
-import { colors } from '../../constants/colors';
 
-// Small reusable avatar component (like Reddit)
-const MiniAvatar = ({ uri, name, size = 32 }: { uri?: string; name: string; size?: number }) => {
-  if (uri) {
-    return <Image source={{ uri }} style={[styles.miniAvatar, { width: size, height: size, borderRadius: size / 2 }]} />;
-  }
+const Avatar = ({ uri, name, size = 36 }: { uri?: string; name: string; size?: number }) => {
+  if (uri) return <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
   return (
-    <View style={[styles.miniAvatarPlaceholder, { width: size, height: size, borderRadius: size / 2 }]}>
-      <Text style={[styles.miniAvatarText, { fontSize: size * 0.45 }]}>{name?.charAt(0)?.toUpperCase() || '?'}</Text>
-    </View>
+    <LinearGradient colors={['#21277B', '#4A6FA5']}
+      style={{ width: size, height: size, borderRadius: size / 2, justifyContent: 'center', alignItems: 'center' }}>
+      <Text style={{ color: '#fff', fontSize: size * 0.42, fontWeight: '700' }}>
+        {name?.charAt(0)?.toUpperCase() || '?'}
+      </Text>
+    </LinearGradient>
   );
 };
 
-const PostDetailScreen = ({ route }: any) => {
+export default function PostDetailScreen({ route }: any) {
   const { postId } = route.params;
-  
   const authState = useSelector((state: RootState) => state.auth as any);
   const myId = authState?.user?.id || authState?.coach?.id;
-  
+
   const [post, setPost] = useState<any>(null);
-  const [newComment, setNewComment] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [comment, setComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const fetchPostDetails = async () => {
-    try {
-      const data = await forumApi.getPostById(postId);
-      setPost(data);
-    } catch (error) {
-      console.error(error);
-    }
+  const loadPost = async () => {
+    try { setPost(await forumApi.getPostById(postId)); }
+    catch { /* silent */ }
   };
-
-  useEffect(() => { fetchPostDetails(); }, []);
+  useEffect(() => { loadPost(); }, []);
 
   const handleReply = async () => {
-    if (!newComment.trim()) return;
-    if (!myId) return Alert.alert('Error', 'Could not find your ID.');
-
-    setIsSubmitting(true);
+    if (!comment.trim() || !myId) return;
+    setSubmitting(true);
     try {
-      const payload = { content: newComment, userId: myId };
-      await forumApi.createComment(postId, payload);
-      setNewComment('');
-      fetchPostDetails();
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsSubmitting(false);
-    }
+      await forumApi.createComment(postId, { content: comment, userId: myId });
+      setComment(''); loadPost();
+    } catch { Alert.alert('Error', 'Failed to post reply.'); }
+    finally { setSubmitting(false); }
   };
 
   const renderComment = ({ item }: { item: any }) => {
-    const isCoachComment = !!item.coach;
-    const authorName = isCoachComment ? item.coach.name : (item.user?.name || 'Anonymous');
-    const authorAvatar = isCoachComment ? item.coach.profilePictureUrl : item.user?.profilePictureUrl;
-
+    const isCP = !!item.coach;
+    const name = isCP ? item.coach.name : (item.user?.name || 'Anonymous');
+    const photo = isCP ? item.coach.profilePictureUrl : item.user?.profilePictureUrl;
     return (
-      <View style={styles.commentCard}>
-        <View style={styles.commentRow}>
-          {/* AVATAR */}
-          <MiniAvatar uri={authorAvatar} name={authorName} size={34} />
-          
-          <View style={styles.commentBody}>
-            {/* AUTHOR HEADER ROW */}
-            <View style={styles.authorHeader}>
-              <Text style={[styles.commentAuthor, isCoachComment && styles.coachNameText]}>
-                {authorName}
-              </Text>
-              
-              {isCoachComment && (
-                <View style={styles.verifiedBadge}>
-                  <Text style={styles.verifiedText}>✓ Coach</Text>
-                </View>
-              )}
-
-              <Text style={styles.commentTime}>
-                {new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-              </Text>
-            </View>
-
-            <Text style={styles.commentContent}>{item.content}</Text>
+      <View style={S.commentCard}>
+        <Avatar uri={photo} name={name} size={36} />
+        <View style={S.commentRight}>
+          <View style={S.commentHeader}>
+            <Text style={[S.commentAuthor, isCP && { color: '#21277B' }]}>{name}</Text>
+            {isCP && <View style={S.coachBadge}><Text style={S.coachBadgeText}>COACH</Text></View>}
+            <Text style={S.commentDate}>
+              {new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+            </Text>
           </View>
+          <Text style={S.commentText}>{item.content}</Text>
         </View>
       </View>
     );
   };
 
-  if (!post) return <ActivityIndicator size="large" color={colors.primary} style={styles.centered} />;
+  if (!post) return (
+    <View style={S.loader}><ActivityIndicator size="large" color="#21277B" /></View>
+  );
 
-  const isCoachPost = !!post.coach;
-  const postAuthor = isCoachPost ? post.coach.name : (post.user?.name || 'Anonymous');
-  const postAvatar = isCoachPost ? post.coach.profilePictureUrl : post.user?.profilePictureUrl;
+  const isCP = !!post.coach;
+  const postAuthor = isCP ? post.coach.name : (post.user?.name || 'Anonymous');
+  const postPhoto = isCP ? post.coach.profilePictureUrl : post.user?.profilePictureUrl;
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={90}
-    >
+    <KeyboardAvoidingView style={S.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
+      <StatusBar barStyle="dark-content" />
       <FlatList
-        data={post.comments}
-        keyExtractor={(item) => item.id}
+        data={post.comments} keyExtractor={(i: any) => i.id}
         renderItem={renderComment}
-        contentContainerStyle={{ paddingBottom: 20 }}
+        contentContainerStyle={S.list}
+        showsVerticalScrollIndicator={false}
         ListHeaderComponent={(
-          <View style={styles.originalPostCard}>
-            {/* ORIGINAL POST with avatar */}
-            <View style={styles.postHeaderRow}>
-              <MiniAvatar uri={postAvatar} name={postAuthor} size={40} />
-              <View style={styles.postHeaderInfo}>
-                <View style={styles.authorHeader}>
-                  <Text style={[styles.postAuthorName, isCoachPost && { color: colors.primary }]}>{postAuthor}</Text>
-                  {isCoachPost && (
-                    <View style={styles.verifiedBadge}>
-                      <Text style={styles.verifiedText}>✓ Verified Coach</Text>
-                    </View>
-                  )}
+          <View>
+            <View style={S.postCard}>
+              <View style={S.postAuthorRow}>
+                <Avatar uri={postPhoto} name={postAuthor} size={44} />
+                <View style={{ marginLeft: 12, flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={[S.postAuthorName, isCP && { color: '#21277B' }]}>{postAuthor}</Text>
+                    {isCP && (
+                      <View style={S.verifiedBadge}>
+                        <Ionicons name="checkmark" size={9} color="#fff" />
+                        <Text style={S.verifiedText}>Verified</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={S.postDate}>
+                    {new Date(post.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+                  </Text>
                 </View>
-                <Text style={styles.postDate}>
-                  {new Date(post.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
-                </Text>
+              </View>
+              <Text style={S.postTitle}>{post.title}</Text>
+              <Text style={S.postContent}>{post.content}</Text>
+              <View style={S.statsBar}>
+                <View style={S.statItem}>
+                  <Ionicons name="chatbubble-outline" size={13} color="#9CA3AF" />
+                  <Text style={S.statText}>{post.comments?.length || 0} replies</Text>
+                </View>
               </View>
             </View>
-
-            <Text style={styles.postTitle}>{post.title}</Text>
-            <Text style={styles.postContent}>{post.content}</Text>
-            
-            <View style={styles.repliesHeader}>
-              <Text style={styles.repliesTitle}>
-                {post.comments?.length || 0} {post.comments?.length === 1 ? 'Reply' : 'Replies'}
-              </Text>
-            </View>
+            {(post.comments?.length || 0) > 0 && (
+              <Text style={S.repliesHeader}>Replies</Text>
+            )}
           </View>
         )}
-        ListEmptyComponent={<Text style={styles.emptyText}>No replies yet. Be the first!</Text>}
+        ListEmptyComponent={
+          <View style={S.emptyReplies}>
+            <View style={S.emptyIcon}><Ionicons name="chatbubble-outline" size={28} color="#21277B" /></View>
+            <Text style={S.emptyTitle}>No replies yet</Text>
+            <Text style={S.emptySub}>Be the first to respond!</Text>
+          </View>
+        }
       />
 
-      {/* REPLY INPUT BAR */}
-      <View style={styles.inputContainer}>
+      <View style={S.replyBar}>
         <TextInput
-          style={styles.input}
-          placeholder="Add a comment..."
-          value={newComment}
-          onChangeText={setNewComment}
-          multiline
+          style={S.replyInput} placeholder="Add a reply..." placeholderTextColor="#C4C9D4"
+          value={comment} onChangeText={setComment} multiline maxLength={1000}
         />
-        <TouchableOpacity 
-          style={[styles.sendButton, !newComment.trim() && { opacity: 0.5 }]} 
-          onPress={handleReply}
-          disabled={!newComment.trim() || isSubmitting}
+        <TouchableOpacity
+          style={[S.sendBtn, !comment.trim() && { opacity: 0.4 }]}
+          onPress={handleReply} disabled={!comment.trim() || submitting}
         >
-          <Text style={styles.sendText}>{isSubmitting ? '...' : 'Reply'}</Text>
+          {submitting
+            ? <ActivityIndicator size="small" color="#fff" />
+            : <Ionicons name="send" size={18} color="#fff" />}
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
-};
+}
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  
-  // Original post
-  originalPostCard: { backgroundColor: colors.white, padding: 20, marginBottom: 10, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  postHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
-  postHeaderInfo: { marginLeft: 12, flex: 1 },
-  postAuthorName: { fontSize: 15, fontWeight: 'bold', color: colors.text },
-  postDate: { fontSize: 12, color: colors.textLight, marginTop: 2 },
-  postTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 8 },
-  postContent: { fontSize: 16, color: colors.text, lineHeight: 24 },
-  
-  repliesHeader: { marginTop: 18, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#f0f0f0' },
-  repliesTitle: { fontSize: 14, fontWeight: 'bold', color: colors.textLight, textTransform: 'uppercase', letterSpacing: 0.5 },
-
-  // Comments
-  commentCard: { backgroundColor: colors.white, paddingVertical: 12, paddingHorizontal: 16, marginHorizontal: 12, marginBottom: 8, borderRadius: 12, borderWidth: 1, borderColor: '#f0f0f0' },
-  commentRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  commentBody: { marginLeft: 10, flex: 1 },
-  
-  authorHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4, gap: 8, flexWrap: 'wrap' },
-  commentAuthor: { fontSize: 13, fontWeight: 'bold', color: colors.textLight },
-  coachNameText: { color: colors.primary },
-  commentTime: { fontSize: 11, color: '#bbb' },
-  
-  verifiedBadge: { backgroundColor: colors.primary, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 },
-  verifiedText: { color: colors.white, fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' },
-
-  commentContent: { fontSize: 14, color: colors.text, lineHeight: 21 },
-  emptyText: { textAlign: 'center', marginTop: 30, color: colors.textLight, fontSize: 14 },
-
-  // Mini Avatar
-  miniAvatar: { borderWidth: 1, borderColor: '#eee' },
-  miniAvatarPlaceholder: { backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
-  miniAvatarText: { color: colors.white, fontWeight: 'bold' },
-
-  // Input bar
-  inputContainer: { flexDirection: 'row', padding: 15, backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: '#eee', alignItems: 'flex-end' },
-  input: { flex: 1, backgroundColor: '#f5f5f5', borderRadius: 20, paddingHorizontal: 15, paddingTop: 12, paddingBottom: 12, fontSize: 15, maxHeight: 100 },
-  sendButton: { marginLeft: 10, backgroundColor: colors.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 20, justifyContent: 'center' },
-  sendText: { color: colors.white, fontWeight: 'bold', fontSize: 15 },
+const SHADOW = Platform.select({
+  ios: { shadowColor: '#21277B', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 12 },
+  android: { elevation: 4 },
 });
 
-export default PostDetailScreen;
+const S = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#F2F4FA' },
+  loader: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F2F4FA' },
+  list: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 16 },
+
+  postCard: { backgroundColor: '#fff', borderRadius: 20, padding: 20, marginBottom: 8, ...SHADOW },
+  postAuthorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  postAuthorName: { fontSize: 15, fontWeight: '700', color: '#0D1117' },
+  postDate: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
+  verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#21277B', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 },
+  verifiedText: { color: '#fff', fontSize: 9, fontWeight: '700' },
+  postTitle: { fontSize: 20, fontWeight: '800', color: '#0D1117', marginBottom: 10, lineHeight: 27, letterSpacing: -0.3 },
+  postContent: { fontSize: 15, color: '#374151', lineHeight: 24, marginBottom: 16 },
+  statsBar: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#F2F4FA', paddingTop: 12, gap: 16 },
+  statItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  statText: { fontSize: 12, color: '#9CA3AF', fontWeight: '500' },
+  repliesHeader: { fontSize: 12, fontWeight: '700', color: '#9CA3AF', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 12, marginTop: 4 },
+
+  commentCard: { backgroundColor: '#fff', borderRadius: 16, padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'flex-start', ...SHADOW },
+  commentRight: { flex: 1, marginLeft: 12 },
+  commentHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5, flexWrap: 'wrap' },
+  commentAuthor: { fontSize: 13, fontWeight: '700', color: '#0D1117' },
+  coachBadge: { backgroundColor: '#EEF1FF', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
+  coachBadgeText: { fontSize: 9, fontWeight: '700', color: '#21277B', letterSpacing: 0.5 },
+  commentDate: { fontSize: 11, color: '#C4C9D4', marginLeft: 'auto' as any },
+  commentText: { fontSize: 14, color: '#374151', lineHeight: 21 },
+
+  emptyReplies: { alignItems: 'center', paddingTop: 40 },
+  emptyIcon: { width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(33,39,123,0.08)', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: '#0D1117', marginBottom: 4 },
+  emptySub: { fontSize: 13, color: '#9CA3AF' },
+
+  replyBar: {
+    flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 16, paddingVertical: 12,
+    backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)',
+    ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.05, shadowRadius: 8 }, android: { elevation: 8 } }),
+  },
+  replyInput: {
+    flex: 1, backgroundColor: '#F2F4FA', borderRadius: 22, paddingHorizontal: 16,
+    paddingTop: 10, paddingBottom: 10, fontSize: 14, maxHeight: 100,
+    color: '#0D1117', marginRight: 10, borderWidth: 1.5, borderColor: '#EAECF0',
+  },
+  sendBtn: {
+    backgroundColor: '#21277B', width: 42, height: 42, borderRadius: 21,
+    justifyContent: 'center', alignItems: 'center',
+    ...Platform.select({ ios: { shadowColor: '#21277B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 8 }, android: { elevation: 6 } }),
+  },
+});

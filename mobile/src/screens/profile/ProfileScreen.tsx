@@ -1,239 +1,203 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, ActivityIndicator } from 'react-native';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  Alert, Image, ActivityIndicator, Platform, StatusBar,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useSelector, useDispatch } from 'react-redux';
 import * as ImagePicker from 'expo-image-picker';
 import { RootState } from '../../store';
 import { logout } from '../../store/slices/authSlice';
 import { profileApi } from '../../services/api/authApi';
-import { colors } from '../../constants/colors';
-import { theme } from '../../constants/theme';
-import { Ionicons } from '@expo/vector-icons'; 
 
-const ProfileScreen = ({ navigation }: any) => {
+export default function ProfileScreen({ navigation }: any) {
   const dispatch = useDispatch();
-  
   const authState = useSelector((state: RootState) => state.auth as any);
   const user = authState.user || authState.coach;
   const role = authState.role || (authState.coach ? 'coach' : 'client');
 
-  const [isUploading, setIsUploading] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const handleLogout = () => {
-    Alert.alert('Log Out', 'Are you sure you want to log out?', [
+    Alert.alert('Log Out', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Log Out', style: 'destructive', onPress: () => dispatch(logout()) }
+      { text: 'Log Out', style: 'destructive', onPress: () => dispatch(logout()) },
     ]);
-  };
-
-  const handleComingSoon = (feature: string) => {
-    Alert.alert('Coming Soon', `The ${feature} feature is currently under development!`);
   };
 
   const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
+      allowsEditing: true, aspect: [1, 1], quality: 0.7,
     });
-
     if (!result.canceled) {
-      setIsUploading(true);
+      setUploading(true);
       try {
-        const imageUri = result.assets[0].uri;
-        const newUrl = await profileApi.uploadAvatar(user.id, role, imageUri);
-        dispatch({ type: 'auth/updateProfilePicture', payload: newUrl }); 
-        Alert.alert('Success', 'Profile picture updated successfully!');
-      } catch (error: any) {
-        Alert.alert('Upload Failed', error.message || 'Something went wrong.');
-      } finally {
-        setIsUploading(false);
-      }
+        const newUrl = await profileApi.uploadAvatar(user.id, role, result.assets[0].uri);
+        dispatch({ type: 'auth/updateProfilePicture', payload: newUrl });
+        Alert.alert('Success', 'Profile picture updated!');
+      } catch (e: any) {
+        Alert.alert('Upload failed', e.message);
+      } finally { setUploading(false); }
     }
   };
 
-  const SettingsRow = ({ icon, title, onPress, color = colors.text }: any) => (
-    <TouchableOpacity style={styles.settingsRow} onPress={onPress}>
-      <View style={styles.settingsRowLeft}>
-        <Ionicons name={icon} size={22} color={color} style={styles.settingsIcon} />
-        <Text style={[styles.settingsTitle, { color }]}>{title}</Text>
+  const coming = (f: string) => Alert.alert('Coming Soon', `${f} is under development.`);
+
+  type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+
+  const Row = ({ icon, label, onPress, danger = false }: { icon: IoniconName; label: string; onPress: () => void; danger?: boolean }) => (
+    <TouchableOpacity style={S.row} onPress={onPress} activeOpacity={0.75}>
+      <View style={[S.rowIcon, danger && S.rowIconDanger]}>
+        <Ionicons name={icon} size={18} color={danger ? '#EF4444' : '#21277B'} />
       </View>
-      <Ionicons name="chevron-forward" size={20} color={colors.textLight} />
+      <Text style={[S.rowLabel, danger && { color: '#EF4444' }]}>{label}</Text>
+      {!danger && <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />}
     </TouchableOpacity>
   );
 
+  const Divider = () => <View style={S.divider} />;
+
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      
-      {/* 1. HEADER PROFILE SECTION */}
-      <View style={styles.headerCard}>
-        <TouchableOpacity onPress={handlePickImage} disabled={isUploading}>
-          <View style={styles.avatarContainer}>
-            {user?.profilePictureUrl ? (
-              <Image source={{ uri: user.profilePictureUrl }} style={styles.avatarImage} />
-            ) : (
-              <View style={styles.avatarPlaceholder}>
-                <Text style={styles.avatarText}>{user?.name?.charAt(0)?.toUpperCase() || '?'}</Text>
-              </View>
-            )}
-            {isUploading ? (
-              <View style={styles.uploadingOverlay}>
-                <ActivityIndicator color={colors.white} size="small" />
-              </View>
-            ) : (
-              <View style={styles.cameraBadge}>
-                <Ionicons name="camera" size={16} color={colors.white} />
-              </View>
-            )}
+    <View style={S.root}>
+      <StatusBar barStyle="light-content" />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+
+        {/* Hero header */}
+        <LinearGradient colors={['#21277B', '#2E3596']} style={S.hero}>
+          <TouchableOpacity style={S.avatarBtn} onPress={handlePickImage} disabled={uploading} activeOpacity={0.85}>
+            {user?.profilePictureUrl
+              ? <Image source={{ uri: user.profilePictureUrl }} style={S.avatar} />
+              : (
+                <View style={S.avatarPlaceholder}>
+                  <Text style={S.avatarInitial}>{user?.name?.charAt(0)?.toUpperCase() || '?'}</Text>
+                </View>
+              )
+            }
+            {uploading
+              ? <View style={S.avatarOverlay}><ActivityIndicator color="#fff" size="small" /></View>
+              : (
+                <View style={S.cameraBadge}>
+                  <Ionicons name="camera" size={14} color="#21277B" />
+                </View>
+              )
+            }
+          </TouchableOpacity>
+
+          <Text style={S.heroName}>{user?.name || 'My Account'}</Text>
+          <Text style={S.heroEmail}>{user?.email}</Text>
+          <View style={S.rolePill}>
+            <Text style={S.roleText}>{role.toUpperCase()}</Text>
           </View>
-        </TouchableOpacity>
+          <View style={S.heroCurve} />
+        </LinearGradient>
 
-        <Text style={styles.name}>{user?.name || 'My Account'}</Text>
-        <Text style={styles.email}>{user?.email}</Text>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{role.toUpperCase()}</Text>
-        </View>
-      </View>
+        <View style={S.body}>
+          {/* Quick action card */}
+          {role === 'client' && (
+            <TouchableOpacity style={S.actionCard} onPress={() => navigation.navigate('CompleteProfile')} activeOpacity={0.88}>
+              <LinearGradient colors={['#EEF1FF', '#E8EAFF']} style={S.actionGrad}>
+                <View style={S.actionIcon}>
+                  <Ionicons name="person-add-outline" size={22} color="#21277B" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={S.actionTitle}>Complete Your Profile</Text>
+                  <Text style={S.actionSub}>Set goals, body metrics & preferences</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#21277B" />
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+          {role === 'coach' && (
+            <TouchableOpacity style={S.actionCard} onPress={() => navigation.navigate('EditCoachProfile')} activeOpacity={0.88}>
+              <LinearGradient colors={['#EEF1FF', '#E8EAFF']} style={S.actionGrad}>
+                <View style={S.actionIcon}>
+                  <Ionicons name="create-outline" size={22} color="#21277B" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={S.actionTitle}>Edit Public Profile</Text>
+                  <Text style={S.actionSub}>Bio, tagline, offerings & pricing</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#21277B" />
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
 
-      {/* COMPLETE YOUR PROFILE (only for clients) */}
-      {role === 'client' && (
-        <TouchableOpacity
-          style={styles.completeProfileCard}
-          onPress={() => navigation.navigate('CompleteProfile')}
-        >
-          <View style={styles.completeProfileLeft}>
-            <View style={styles.miniDial}>
-              <Ionicons name="person-add-outline" size={24} color={colors.primary} />
-            </View>
-            <View>
-              <Text style={styles.completeProfileTitle}>Complete Your Profile</Text>
-              <Text style={styles.completeProfileSubtitle}>
-                Set your goals, body metrics & preferences
-              </Text>
-            </View>
+          {/* Account */}
+          <Text style={S.sectionLabel}>ACCOUNT</Text>
+          <View style={S.card}>
+            <Row icon="person-outline" label="Personal Information" onPress={() => coming('Personal Info')} />
+            <Divider />
+            <Row icon="call-outline" label="Phone Number" onPress={() => coming('Phone Number')} />
+            <Divider />
+            <Row icon="lock-closed-outline" label="Change Password" onPress={() => coming('Change Password')} />
           </View>
-          <Ionicons name="chevron-forward" size={22} color={colors.textLight} />
-        </TouchableOpacity>
-      )}
 
-      {/* EDIT PUBLIC PROFILE (only for coaches) */}
-      {role === 'coach' && (
-        <TouchableOpacity
-          style={styles.completeProfileCard}
-          onPress={() => navigation.navigate('EditCoachProfile')}
-        >
-          <View style={styles.completeProfileLeft}>
-            <View style={styles.miniDial}>
-              <Ionicons name="create-outline" size={24} color={colors.primary} />
-            </View>
-            <View>
-              <Text style={styles.completeProfileTitle}>Edit Public Profile</Text>
-              <Text style={styles.completeProfileSubtitle}>
-                Bio, tagline, offerings & pricing
-              </Text>
-            </View>
+          {/* Billing */}
+          <Text style={S.sectionLabel}>BILLING</Text>
+          <View style={S.card}>
+            <Row icon="card-outline" label="Payment Methods" onPress={() => coming('Payment Methods')} />
+            <Divider />
+            <Row icon="receipt-outline" label="Billing History" onPress={() => coming('Billing History')} />
           </View>
-          <Ionicons name="chevron-forward" size={22} color={colors.textLight} />
-        </TouchableOpacity>
-      )}
 
-      {/* 2. ACCOUNT SETTINGS */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account Settings</Text>
-        <View style={styles.sectionCard}>
-          <SettingsRow icon="person-outline" title="Personal Information" onPress={() => handleComingSoon('Personal Info')} />
-          <View style={styles.divider} />
-          <SettingsRow icon="call-outline" title="Phone Number" onPress={() => handleComingSoon('Phone Number')} />
-          <View style={styles.divider} />
-          <SettingsRow icon="lock-closed-outline" title="Change Password" onPress={() => handleComingSoon('Change Password')} />
+          {/* Preferences */}
+          <Text style={S.sectionLabel}>PREFERENCES</Text>
+          <View style={S.card}>
+            <Row icon="notifications-outline" label="Push Notifications" onPress={() => coming('Notifications')} />
+            <Divider />
+            <Row icon="help-circle-outline" label="Help & Support" onPress={() => coming('Support')} />
+          </View>
+
+          {/* Logout */}
+          <View style={[S.card, { marginTop: 8 }]}>
+            <Row icon="log-out-outline" label="Log Out" onPress={handleLogout} danger />
+          </View>
+
+          <Text style={S.version}>Version 1.0.0</Text>
         </View>
-      </View>
-
-      {/* 3. BILLING & PAYMENTS */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Billing & Subscriptions</Text>
-        <View style={styles.sectionCard}>
-          <SettingsRow icon="card-outline" title="Payment Methods" onPress={() => handleComingSoon('Payment Methods')} />
-          <View style={styles.divider} />
-          <SettingsRow icon="receipt-outline" title="Billing History" onPress={() => handleComingSoon('Billing History')} />
-        </View>
-      </View>
-
-      {/* 4. PREFERENCES & LOGOUT */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Preferences</Text>
-        <View style={styles.sectionCard}>
-          <SettingsRow icon="notifications-outline" title="Push Notifications" onPress={() => handleComingSoon('Notifications')} />
-          <View style={styles.divider} />
-          <SettingsRow icon="help-circle-outline" title="Help & Support" onPress={() => handleComingSoon('Support')} />
-        </View>
-      </View>
-
-      {/* LOGOUT BUTTON */}
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Ionicons name="log-out-outline" size={22} color={colors.error || '#e74c3c'} style={styles.settingsIcon} />
-        <Text style={styles.logoutText}>Log Out</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.versionText}>App Version 1.0.0</Text>
-      <View style={{ height: 40 }} />
-      
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
-};
+}
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  headerCard: { backgroundColor: colors.white, padding: 30, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#eee', marginBottom: 20 },
-  avatarContainer: { position: 'relative', marginBottom: 15 },
-  avatarPlaceholder: { width: 90, height: 90, borderRadius: 45, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
-  avatarImage: { width: 90, height: 90, borderRadius: 45 },
-  avatarText: { color: colors.white, fontSize: 36, fontWeight: 'bold' },
-  cameraBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: colors.primary, width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: colors.white },
-  uploadingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 45, justifyContent: 'center', alignItems: 'center' },
-  name: { fontSize: 24, fontWeight: 'bold', color: colors.text, marginBottom: 5 },
-  email: { fontSize: 16, color: colors.textLight, marginBottom: 15 },
-  badge: { backgroundColor: '#f0f0f0', paddingHorizontal: 15, paddingVertical: 6, borderRadius: 20 },
-  badgeText: { fontSize: 12, fontWeight: 'bold', color: colors.textLight, letterSpacing: 1 },
-
-  // Complete Profile Card
-  completeProfileCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#e8f0fe',
-    marginHorizontal: 20,
-    marginBottom: 25,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-  },
-  completeProfileLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  miniDial: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: colors.primary,
-  },
-  completeProfileTitle: { fontSize: 15, fontWeight: 'bold', color: colors.primary },
-  completeProfileSubtitle: { fontSize: 12, color: colors.textLight, marginTop: 2 },
-
-  section: { paddingHorizontal: 20, marginBottom: 25 },
-  sectionTitle: { fontSize: 14, fontWeight: 'bold', color: colors.textLight, textTransform: 'uppercase', marginBottom: 10, letterSpacing: 0.5, marginLeft: 5 },
-  sectionCard: { backgroundColor: colors.white, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#eee' },
-  settingsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, paddingHorizontal: 20 },
-  settingsRowLeft: { flexDirection: 'row', alignItems: 'center' },
-  settingsIcon: { marginRight: 15 },
-  settingsTitle: { fontSize: 16, fontWeight: '500' },
-  divider: { height: 1, backgroundColor: '#eee', marginLeft: 55 },
-  logoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white, marginHorizontal: 20, paddingVertical: 16, borderRadius: 16, borderWidth: 1, borderColor: '#ffebee', marginTop: 10, marginBottom: 20 },
-  logoutText: { fontSize: 16, fontWeight: 'bold', color: colors.error || '#e74c3c' },
-  versionText: { textAlign: 'center', color: colors.textLight, fontSize: 12 },
+const CARD_SHADOW = Platform.select({
+  ios: { shadowColor: '#21277B', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8 },
+  android: { elevation: 3 },
 });
 
-export default ProfileScreen;
+const S = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#F2F4FA' },
+
+  hero: { paddingTop: 60, paddingBottom: 48, alignItems: 'center' },
+  avatarBtn: { position: 'relative', marginBottom: 14 },
+  avatar: { width: 88, height: 88, borderRadius: 44, borderWidth: 3, borderColor: 'rgba(255,255,255,0.4)' },
+  avatarPlaceholder: { width: 88, height: 88, borderRadius: 44, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: 'rgba(255,255,255,0.4)' },
+  avatarInitial: { fontSize: 34, fontWeight: '800', color: '#fff' },
+  avatarOverlay: { position: 'absolute', inset: 0, borderRadius: 44, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' },
+  cameraBadge: { position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: 14, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#21277B' },
+  heroName: { fontSize: 22, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
+  heroEmail: { fontSize: 13, color: 'rgba(255,255,255,0.65)', marginTop: 3 },
+  rolePill: { marginTop: 10, backgroundColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 14, paddingVertical: 5, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
+  roleText: { fontSize: 11, fontWeight: '700', color: '#fff', letterSpacing: 1.2 },
+  heroCurve: { position: 'absolute', bottom: -1, left: 0, right: 0, height: 22, backgroundColor: '#F2F4FA', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+
+  body: { paddingHorizontal: 16, paddingTop: 8 },
+
+  actionCard: { borderRadius: 16, overflow: 'hidden', marginBottom: 24, ...CARD_SHADOW },
+  actionGrad: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 14, borderRadius: 16, borderWidth: 1.5, borderColor: '#DADEFD' },
+  actionIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', ...Platform.select({ ios: { shadowColor: '#21277B', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 6 }, android: { elevation: 2 } }) },
+  actionTitle: { fontSize: 14, fontWeight: '700', color: '#21277B' },
+  actionSub: { fontSize: 12, color: '#6B7280', marginTop: 2 },
+
+  sectionLabel: { fontSize: 11, fontWeight: '700', color: '#9CA3AF', letterSpacing: 1, marginBottom: 8, marginTop: 4, marginLeft: 4 },
+  card: { backgroundColor: '#fff', borderRadius: 16, marginBottom: 20, overflow: 'hidden', ...CARD_SHADOW },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15, paddingHorizontal: 16, gap: 12 },
+  rowIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#EEF1FF', justifyContent: 'center', alignItems: 'center' },
+  rowIconDanger: { backgroundColor: '#FEF2F2' },
+  rowLabel: { flex: 1, fontSize: 15, fontWeight: '500', color: '#0D1117' },
+  divider: { height: 1, backgroundColor: '#F2F4FA', marginLeft: 64 },
+
+  version: { textAlign: 'center', color: '#C4C9D4', fontSize: 12, marginTop: 8 },
+});

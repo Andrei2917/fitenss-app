@@ -1,7 +1,8 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
+
+import LiquidGlassTabBar from '../components/navigation/LiquidGlassTabBar';
 
 import { ForumStackNavigator } from './ForumStackNavigator';
 import CoachDashboardScreen from '../screens/coach/CoachDashboardScreen';
@@ -44,38 +45,19 @@ const MessagesStackNavigator = () => (
 
 const Tab = createBottomTabNavigator();
 
+const COACH_TABS = [
+  { name: 'HomeTab',       label: 'Home',       icon: 'home-outline' as const,        iconFocused: 'home' as const },
+  { name: 'DashboardTab',  label: 'My Clients', icon: 'people-outline' as const,      iconFocused: 'people' as const },
+  { name: 'VideoVaultTab', label: 'Videos',     icon: 'videocam-outline' as const,    iconFocused: 'videocam' as const },
+  { name: 'MessagesTab',   label: 'Messages',   icon: 'chatbubbles-outline' as const, iconFocused: 'chatbubbles' as const },
+  { name: 'ProfileTab',    label: 'Settings',   icon: 'settings-outline' as const,    iconFocused: 'settings' as const },
+];
+
 const CoachTabNavigator = () => {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textLight,
-        headerShown: false, 
-        
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap = 'help-circle';
-
-          if (route.name === 'HomeTab') {
-            iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'DashboardTab') {
-            iconName = focused ? 'people' : 'people-outline';
-          } else if (route.name === 'VideoVaultTab') {
-            iconName = focused ? 'videocam' : 'videocam-outline';
-          } else if (route.name === 'MessagesTab') {
-            iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
-          } else if (route.name === 'ProfileTab') {
-            iconName = focused ? 'settings' : 'settings-outline';
-          }
-
-          return <Ionicons name={iconName} size={size + 2} color={color} />;
-        },
-        
-        tabBarStyle: {
-          paddingBottom: 5,
-          paddingTop: 5,
-          height: 60,
-        },
-      })}
+      tabBar={(props) => <LiquidGlassTabBar {...props} tabs={COACH_TABS} />}
+      screenOptions={{ headerShown: false }}
     >
       <Tab.Screen name="HomeTab" component={ForumStackNavigator} options={{ title: 'Home' }} />
       <Tab.Screen name="DashboardTab" component={CoachDashboardScreen} options={{ title: 'My Clients', headerShown: true, headerTitle: 'Coach Dashboard' }} />
